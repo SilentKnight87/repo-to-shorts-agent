@@ -1,33 +1,39 @@
-# Submission Copy
+# Submission copy
 
-## X demo post draft
+## Discord-ready version
 
-I built Repo-to-Shorts Agent for the Hermes Agent Creative Hackathon.
+Built **Repo-to-Shorts Agent** for the Nous Research Hermes Agent Creative Hackathon.
 
-Paste in a GitHub repo. Hermes turns it into a launch-ready technical demo video package: repo brief, story arc, architecture diagram, narration, captions, and X-ready launch copy.
+It turns a GitHub repo or local repo into a launch-ready technical short-video package:
 
-The goal is simple: close the gap between "I built something" and "people understand why it matters."
+- repo brief
+- story arc + storyboard
+- architecture SVG
+- narration script
+- captions SRT
+- X-ready launch copy
+- Discord submission copy
+- Kimi critic/script-editor pass
+- browser-presentable `demo.html` for screen recording
 
-Kimi is used as the critic/script editor pass to tighten the narrative before the final demo asset is produced.
+Run it with:
 
-Demo below.
+```bash
+repo-shorts analyze . --audience "hackathon judges" --out runs
+```
 
-@NousResearch
+The MVP is deterministic and credential-safe. If `KIMI_API_KEY` is missing, it ships a fallback critic pass and documents exactly how to enable real Kimi later.
 
-## Discord submission draft
+## Short X-ready version
 
-Repo-to-Shorts Agent turns a GitHub repo into a launch-ready technical demo video package.
+Built Repo-to-Shorts Agent for the Hermes Creative Hackathon.
 
-It uses Hermes Agent to ingest a repo, extract the story, plan a storyboard, generate visual assets, write narration and captions, run a Kimi critic/editor pass, and package the final short-form demo + X copy.
+Paste a repo → get a repo brief, storyboard, architecture diagram, narration, captions, launch copy, Kimi critic notes, and a browser demo artifact ready to screen-record.
 
-Submission post: [paste X link]
+One polished golden path for turning working code into a clear launch story.
 
-## 60-90 second demo structure
+## Longer project description
 
-1. Show a raw repo/readme.
-2. Run `repo-shorts analyze <repo>`.
-3. Show generated repo brief and storyboard.
-4. Show architecture diagram and visual frames.
-5. Show Kimi critique improving the script.
-6. Show final launch video/package.
-7. Close with the value: technical builders need distribution artifacts, not just code.
+Most hackathon repos die in the gap between “it works” and “people understand why it matters.” Repo-to-Shorts Agent closes that gap. It ingests a local repo or GitHub URL, extracts concrete repo facts, creates a deterministic technical short-video narrative, runs a Kimi critic/script-editor stage, and writes all launch artifacts into a timestamped run folder.
+
+The demo artifact is intentionally browser-first: open `demo.html`, record the polished cards, use `narration.md` and `captions.srt`, then post with the generated X and Discord copy.
