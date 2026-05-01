@@ -1,0 +1,27 @@
+[build-system]
+requires = ["setuptools>=64", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "repo-to-shorts-agent"
+version = "0.1.0"
+description = "Turn a repo into a launch-ready technical demo video package."
+requires-python = ">=3.10"
+dependencies = [
+  "typer>=0.12",
+  "jinja2>=3.1",
+  "rich>=13.7",
+]
+
+[project.optional-dependencies]
+dev = ["pytest>=8.0", "ruff>=0.5"]
+render = ["moviepy>=1.0"]
+
+[project.scripts]
+repo-shorts = "repo_to_shorts.cli:app"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+
+[tool.ruff]
+line-length = 100
