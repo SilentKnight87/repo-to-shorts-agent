@@ -20,8 +20,15 @@ render = ["moviepy>=1.0"]
 [project.scripts]
 repo-shorts = "repo_to_shorts.cli:app"
 
+[tool.setuptools.packages.find]
+where = ["src"]
+
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 
 [tool.ruff]
-line-length = 100
+line-length = 120
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "B", "BLE"]
+ignore = ["E501", "B008"]

@@ -1,35 +1,46 @@
 from __future__ import annotations
 
-from datetime import datetime
 from pathlib import Path
 
 import typer
 from rich.console import Console
 
-app = typer.Typer(help="Turn a repository into a technical short video package.")
+from repo_to_shorts.pipeline import run_analysis
+
+DEFAULT_OUT = Path("runs")
+
+app = typer.Typer(help="Turn a repository into a technical short-video package.")
 console = Console()
 
 
+@app.callback()
+def main() -> None:
+    """Repo-to-Shorts command group."""
+
+
 def _slug(value: str) -> str:
-    return "".join(ch.lower() if ch.isalnum() else "-" for ch in value).strip("-")[:60]
+    slug = "".join(ch.lower() if ch.isalnum() else "-" for ch in value).strip("-")
+    while "--" in slug:
+        slug = slug.replace("--", "-")
+    return slug[:60] or "repo"
 
 
 @app.command()
-def analyze(target: str = typer.Argument(..., help="Local repo path or GitHub URL.")) -> None:
-    """Create a visible run folder for the repo-to-shorts pipeline."""
-    timestamp = datetime.now().strftime("%Y%m%d-%H%M%S")
-    target_slug = _slug(Path(target).name or target)
-    run_dir = Path("runs") / f"{timestamp}-{target_slug}"
-    run_dir.mkdir(parents=True, exist_ok=True)
-
-    metadata = run_dir / "metadata.md"
-    metadata.write_text(
-        f"# Repo-to-Shorts Run\n\n- Target: `{target}`\n- Created: {datetime.now().isoformat()}\n\n",
-        encoding="utf-8",
-    )
+def analyze(
+    target: str = typer.Argument(..., help="Local repo path or GitHub URL."),
+    audience: str = typer.Option("technical builders", "--audience", "-a", help="Audience for the short."),
+    out: Path = typer.Option(DEFAULT_OUT, "--out", "-o", help="Directory where run folders are written."),
+    force: bool = typer.Option(False, "--force", help="Overwrite an existing timestamped run directory if needed."),
+) -> None:
+    """Analyze TARGET and create a launch-ready short-video package."""
+    try:
+        run_dir = run_analysis(target, audience=audience, out_dir=out, force=force)
+    except Exception as exc:  # noqa: BLE001 - Typer should print concise CLI failures.
+        raise typer.BadParameter(str(exc)) from exc
 
     console.print(f"[green]Created run:[/green] {run_dir}")
-    console.print(f"[cyan]Next:[/cyan] ingest repo facts, create storyboard, generate visuals.")
+    console.print(f"[cyan]Open:[/cyan] {run_dir / 'demo.html'}")
+    console.print("[cyan]Artifacts:[/cyan] repo brief, storyboard, SVG architecture, narration, captions, launch copy, Kimi critique")
 
 
 if __name__ == "__main__":
