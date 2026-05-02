@@ -8,6 +8,24 @@ Repo-to-Shorts Agent turns a GitHub repo or local repo into a finished, submissi
 
 Ship a credible Nous Hermes Creative Hackathon demo that proves Hermes can orchestrate a useful creative workflow for technical builders: turning working code into a clear launch story.
 
+## Strategic positioning
+
+Repo-to-Shorts should be positioned as a Hermes creative workflow, not merely a standalone Python script.
+
+Hermes is the harness:
+- coordinates repo analysis, file operations, terminal commands, browser/demo artifacts, and creative skills
+- provides the agentic execution layer
+- makes the workflow reusable as a builder tool
+
+Kimi should be used on two fronts:
+
+1. **Kimi powers the Hermes harness** where possible. The intended demo posture is: Kimi reasons, Hermes acts. In other words, Hermes Agent runs the creative production workflow with Kimi as the model behind the harness.
+2. **Kimi reviews the generated package inside the product.** Repo-to-Shorts calls Kimi as a critic/script editor to sharpen hook, narration, risk notes, and CTA.
+
+This two-front strategy is stronger than a token API call because it makes Kimi both the orchestration brain and the visible editorial collaborator.
+
+See `docs/HACKATHON_STRATEGY.md` for the submission narrative and demo framing.
+
 ## Current truth
 
 The current repo is an MVP scaffold that generates a browser-recordable short-video package. It does not yet call the live Kimi model and does not yet render an MP4 automatically.
@@ -57,6 +75,16 @@ Hackathon judge view:
 ## Product requirements
 
 ### P0, must ship for credible submission
+
+0. Hermes harness positioning
+
+Must document and demonstrate Repo-to-Shorts as a Hermes workflow:
+- Hermes orchestrates the run, file generation, and creative artifact assembly.
+- Kimi can power the Hermes harness as the selected model/provider.
+- Repo-to-Shorts can be invoked cleanly from a Hermes session.
+- The final submission explains: Kimi reasons, Hermes acts, Repo-to-Shorts packages the output.
+
+Current status: documented in `docs/HACKATHON_STRATEGY.md`; not yet packaged as a dedicated Hermes skill/workflow.
 
 1. CLI golden path
 

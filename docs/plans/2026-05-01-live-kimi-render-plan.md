@@ -2,11 +2,59 @@
 
 > **For Hermes:** Use subagent-driven-development skill to implement this plan task-by-task.
 
-**Goal:** Upgrade Repo-to-Shorts from a deterministic browser-recordable package generator into an honest hackathon MVP with live Kimi critique support and an optional MP4 render path.
+**Goal:** Upgrade Repo-to-Shorts from a deterministic browser-recordable package generator into an honest hackathon MVP with live Kimi critique support, Hermes harness positioning, and an optional MP4 render path.
 
-**Architecture:** Keep the current deterministic golden path intact. Add Kimi as a small adapter behind `critique_story()`, with API/fallback metadata. Add rendering as an optional layer that consumes generated run artifacts instead of entangling it with ingestion/story logic.
+**Architecture:** Keep the current deterministic golden path intact. Add Kimi as a small adapter behind `critique_story()`, with API/fallback metadata. Document and, if possible, demonstrate Hermes running the workflow with Kimi as the selected model. Add rendering as an optional layer that consumes generated run artifacts instead of entangling it with ingestion/story logic.
 
-**Tech Stack:** Python 3.13, Typer, Jinja2, Rich, pytest, Ruff, optional OpenAI SDK or HTTP client for Moonshot/Kimi, optional MoviePy/ffmpeg for MP4.
+**Tech Stack:** Python 3.13, Typer, Jinja2, Rich, pytest, Ruff, Hermes Agent CLI/skills, optional OpenAI SDK or HTTP client for Moonshot/Kimi, optional MoviePy/ffmpeg for MP4.
+
+---
+
+## Task 0: Document Hermes harness + two-front Kimi strategy
+
+**Objective:** Make the repo's strategy match Peter's intended positioning: Hermes is the harness, Kimi powers the harness, and Kimi also appears as a product-level critic/editor.
+
+**Files:**
+- Create: `docs/HACKATHON_STRATEGY.md`
+- Modify: `docs/PRD.md`
+- Modify: `README.md`
+
+**Step 1: Write the strategy doc**
+
+Document:
+- What Repo-to-Shorts builds.
+- Why it maps to creativity/usefulness/presentation.
+- The two-front Kimi strategy.
+- Hermes creative skills we can leverage.
+- The 60-second winning demo structure.
+
+**Step 2: Update PRD**
+
+Add a P0 requirement for Hermes harness positioning.
+
+**Step 3: Update README**
+
+Add a short section linking to `docs/HACKATHON_STRATEGY.md` and explaining:
+
+```text
+Kimi reasons. Hermes acts. Repo-to-Shorts packages the output.
+```
+
+**Step 4: Verify docs only**
+
+```bash
+.venv/bin/python -m pytest -q
+.venv/bin/ruff check .
+```
+
+Expected: PASS.
+
+**Step 5: Commit**
+
+```bash
+git add docs/HACKATHON_STRATEGY.md docs/PRD.md docs/plans/2026-05-01-live-kimi-render-plan.md README.md
+git commit -m "docs: define hermes kimi hackathon strategy"
+```
 
 ---
 

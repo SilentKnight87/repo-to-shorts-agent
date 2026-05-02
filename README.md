@@ -6,6 +6,22 @@ Built for the Nous Research Hermes Agent Creative Hackathon as a polished MVP go
 
 > Repo remains private. The tool does not publish or submit anything externally.
 
+## Kimi + Hermes strategy
+
+Repo-to-Shorts is intended to be a Hermes creative workflow, not just a standalone Python script.
+
+The submission strategy is two-front Kimi usage:
+
+1. Kimi powers the Hermes harness where possible: Kimi reasons, Hermes acts.
+2. Repo-to-Shorts calls Kimi as a critic/script editor inside the generated artifact pipeline.
+
+See:
+
+```text
+docs/HACKATHON_STRATEGY.md
+docs/PRD.md
+```
+
 ## Install
 
 Use Python 3.13 from Homebrew on the hackathon machine:
