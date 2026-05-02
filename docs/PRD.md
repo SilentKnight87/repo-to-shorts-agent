@@ -8,6 +8,12 @@ Repo-to-Shorts Agent turns a GitHub repo or local repo into a finished, submissi
 
 Ship a credible Nous Hermes Creative Hackathon demo that proves Hermes can orchestrate a useful creative workflow for technical builders: turning working code into a clear launch story.
 
+Official source:
+- X announcement: `https://x.com/NousResearch/status/2045225469088326039`
+- Readable mirror: `https://en.rattibha.com/thread/2045225469088326039`
+
+Contest framing: Hermes Agent pushed into creative domains including video, image, audio, 3D, long-form writing, creative software, interactive media, and more. Judging criteria are creativity, usefulness, and presentation. Kimi Track requires proof of Kimi model usage in the submission video.
+
 ## Strategic positioning
 
 Repo-to-Shorts should be positioned as a Hermes creative workflow, not merely a standalone Python script.
