@@ -55,6 +55,7 @@ Options:
 - `--audience`, `-a`: audience to tailor the short-video package for.
 - `--out`, `-o`: output directory for timestamped run folders. Default: `runs`.
 - `--force`: allow overwriting an existing timestamped run directory if one collides.
+- `--kimi-model`: OpenRouter/Moonshot Kimi model name. Default: `moonshotai/kimi-k2.6`.
 
 ## Generated artifacts
 
@@ -86,9 +87,19 @@ The MVP deliberately favors one reliable, deterministic golden path over a gener
 
 ## Kimi critic stage
 
-Kimi is represented as an explicit critic/script-editor stage in `repo_to_shorts.kimi`.
+Kimi is an explicit critic/script-editor stage in `repo_to_shorts.kimi`.
 
-If `KIMI_API_KEY` is absent, the tool writes a deterministic fallback critique that documents how to enable real Kimi later. If the key is present, the MVP records that Kimi is configured but keeps output deterministic; the next polish step is to wire the OpenAI-compatible Moonshot/Kimi chat completion call in the adapter.
+Default live mode uses OpenRouter with Kimi 2.6:
+
+```bash
+export OPENROUTER_API_KEY="[REDACTED]"
+repo-shorts analyze . \
+  --audience "Nous Research Hermes Agent Creative Hackathon judges" \
+  --out runs \
+  --kimi-model moonshotai/kimi-k2.6
+```
+
+If `OPENROUTER_API_KEY`/`KIMI_API_KEY` is absent, the tool writes a deterministic fallback critique and records that honestly in `metadata.json`. If the API call fails, it still writes the package and records `api-error-fallback` rather than pretending the run was live.
 
 ## Development
 

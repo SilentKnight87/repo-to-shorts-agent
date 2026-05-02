@@ -34,7 +34,13 @@ class StoryPackage:
     cta: str
 
 
-def run_analysis(target: str, audience: str, out_dir: Path | str = Path("runs"), force: bool = False) -> Path:
+def run_analysis(
+    target: str,
+    audience: str,
+    out_dir: Path | str = Path("runs"),
+    force: bool = False,
+    kimi_model: str | None = None,
+) -> Path:
     snapshot = ingest_target(target)
     timestamp = datetime.now().strftime("%Y%m%d-%H%M%S")
     run_dir = Path(out_dir) / f"{timestamp}-{_slug(snapshot.name)}"
@@ -45,7 +51,7 @@ def run_analysis(target: str, audience: str, out_dir: Path | str = Path("runs"),
     package = build_story(snapshot, audience)
     repo_brief = render_repo_brief(snapshot, audience, package)
     storyboard = render_storyboard(snapshot, audience, package)
-    kimi = critique_story(snapshot, audience, storyboard)
+    kimi = critique_story(snapshot, audience, storyboard, model=kimi_model)
 
     files = {
         "repo_brief.md": repo_brief,
@@ -69,7 +75,12 @@ def run_analysis(target: str, audience: str, out_dir: Path | str = Path("runs"),
         "audience": audience,
         "created_at": datetime.now().isoformat(timespec="seconds"),
         "artifacts": list(ARTIFACTS),
-        "kimi": {"mode": kimi.mode},
+        "kimi": {
+            "mode": kimi.mode,
+            "model": kimi.model,
+            "provider": kimi.provider,
+            "fallback_reason": kimi.fallback_reason,
+        },
     }
     (run_dir / "metadata.json").write_text(json.dumps(metadata, indent=2) + "\n", encoding="utf-8")
     return run_dir

@@ -19,10 +19,13 @@ It turns a GitHub repo or local repo into a launch-ready technical short-video p
 Run it with:
 
 ```bash
-repo-shorts analyze . --audience "hackathon judges" --out runs
+repo-shorts analyze . \
+  --audience "hackathon judges" \
+  --out runs \
+  --kimi-model moonshotai/kimi-k2.6
 ```
 
-The MVP is deterministic and credential-safe. If `KIMI_API_KEY` is missing, it ships a fallback critic pass and documents exactly how to enable real Kimi later.
+With `OPENROUTER_API_KEY` set, the Kimi critic stage calls OpenRouter's `moonshotai/kimi-k2.6` model and records `live-api` proof in `metadata.json`. Without credentials, it fails safely into an honest deterministic fallback.
 
 ## Short X-ready version
 

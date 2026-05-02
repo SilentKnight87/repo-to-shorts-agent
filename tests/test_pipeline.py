@@ -106,7 +106,12 @@ def test_run_analysis_writes_launch_ready_artifact_set(tmp_path: Path):
     metadata = json.loads((run_dir / "metadata.json").read_text(encoding="utf-8"))
     assert metadata["audience"] == "Python builders"
     assert metadata["target"] == str(repo)
-    assert metadata["kimi"]["mode"] == "deterministic-fallback"
+    assert metadata["kimi"] == {
+        "mode": "deterministic-fallback",
+        "model": None,
+        "provider": "none",
+        "fallback_reason": "OPENROUTER_API_KEY or KIMI_API_KEY not set",
+    }
     assert "Sample Repo" in (run_dir / "repo_brief.md").read_text(encoding="utf-8")
     assert "Kimi critic" in (run_dir / "kimi_critique.md").read_text(encoding="utf-8")
     assert "<!doctype html>" in (run_dir / "demo.html").read_text(encoding="utf-8").lower()
@@ -146,7 +151,19 @@ def test_cli_analyze_smoke_writes_artifacts_to_requested_out_dir(tmp_path: Path)
     out = tmp_path / "custom-runs"
     runner = CliRunner()
 
-    result = runner.invoke(app, ["analyze", str(repo), "--audience", "hackathon judges", "--out", str(out)])
+    result = runner.invoke(
+        app,
+        [
+            "analyze",
+            str(repo),
+            "--audience",
+            "hackathon judges",
+            "--out",
+            str(out),
+            "--kimi-model",
+            "moonshotai/kimi-k2.6",
+        ],
+    )
 
     assert result.exit_code == 0, result.output
     assert "Created run:" in result.output

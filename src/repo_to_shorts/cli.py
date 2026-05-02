@@ -31,10 +31,11 @@ def analyze(
     audience: str = typer.Option("technical builders", "--audience", "-a", help="Audience for the short."),
     out: Path = typer.Option(DEFAULT_OUT, "--out", "-o", help="Directory where run folders are written."),
     force: bool = typer.Option(False, "--force", help="Overwrite an existing timestamped run directory if needed."),
+    kimi_model: str | None = typer.Option(None, "--kimi-model", help="OpenRouter/Moonshot Kimi model name."),
 ) -> None:
     """Analyze TARGET and create a launch-ready short-video package."""
     try:
-        run_dir = run_analysis(target, audience=audience, out_dir=out, force=force)
+        run_dir = run_analysis(target, audience=audience, out_dir=out, force=force, kimi_model=kimi_model)
     except Exception as exc:  # noqa: BLE001 - Typer should print concise CLI failures.
         raise typer.BadParameter(str(exc)) from exc
 

@@ -6,7 +6,10 @@
 /opt/homebrew/bin/python3.13 -m venv .venv
 .venv/bin/python -m pip install --upgrade pip
 .venv/bin/python -m pip install -e '.[dev]'
-repo-shorts analyze . --audience "Nous Research Hermes Agent Creative Hackathon judges" --out runs
+OPENROUTER_API_KEY="[REDACTED]" repo-shorts analyze . \
+  --audience "Nous Research Hermes Agent Creative Hackathon judges" \
+  --out runs \
+  --kimi-model moonshotai/kimi-k2.6
 ```
 
 Open the generated `demo.html` in a browser.
@@ -33,7 +36,7 @@ Visual: quickly show generated folder and artifact names, then return to `demo.h
 
 ### 35–50s — Kimi critic/editor
 
-Narration: “Kimi appears as a critic and script editor. If credentials are absent, the deterministic fallback still gives concrete editorial notes and documents how to enable real Kimi later.”
+Narration: “Kimi 2.6 runs through OpenRouter as the critic and script editor. The metadata records `live-api`, the model name, and the provider, so the demo shows actual Kimi usage instead of hand-wavy model perfume.”
 
 Visual: Kimi critic card in the demo artifact or `kimi_critique.md`.
 
