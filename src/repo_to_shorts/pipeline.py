@@ -218,9 +218,12 @@ h1 { font-size: clamp(42px, 8vw, 88px); line-height: .9; margin: 0 0 18px; }
 .promise { font-size: 24px; color: #ddd6fe; max-width: 840px; }
 .grid { display: grid; grid-template-columns: repeat(2, minmax(0,1fr)); gap: 20px; margin-top: 24px; }
 .card { background: rgba(3,7,18,.74); border: 1px solid #374151; border-radius: 22px; padding: 24px; }
+.wide { grid-column: 1 / -1; }
 li { margin: 14px 0; font-size: 20px; }
 .badge { display: inline-block; padding: 8px 12px; border-radius: 999px; background: #065f46; color: #bbf7d0; font-weight: 700; }
-pre { white-space: pre-wrap; max-height: 260px; overflow: hidden; color: #c4b5fd; }
+pre { white-space: pre-wrap; max-height: 340px; overflow: hidden; color: #c4b5fd; font-size: 16px; line-height: 1.45; }
+.artifacts { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 12px; }
+.artifacts span { border: 1px solid #475569; border-radius: 999px; padding: 8px 11px; color: #bfdbfe; background: rgba(30,41,59,.75); font-weight: 700; }
 </style>
 </head>
 <body><main class="deck">
@@ -235,6 +238,7 @@ pre { white-space: pre-wrap; max-height: 260px; overflow: hidden; color: #c4b5fd
 <div class="card"><h2>Architecture</h2><p>Repo → Ingest → Story → Kimi critic → Artifacts → Demo HTML.</p><p>Audience: {{ audience }}</p></div>
 <div class="card"><h2>Kimi critic/editor</h2><pre>{{ kimi }}</pre></div>
 <div class="card"><h2>Recording flow</h2><p>Open this page, zoom to 125%, record the hero, story beats, Kimi pass, then artifact checklist.</p></div>
+<div class="card wide"><h2>Artifact checklist</h2><p>Everything below is generated into the run folder for the final submission package.</p><div class="artifacts"><span>repo_brief.md</span><span>storyboard.md</span><span>architecture.svg</span><span>narration.md</span><span>captions.srt</span><span>x_post.md</span><span>submission.md</span><span>kimi_critique.md</span><span>demo.html</span></div></div>
 </section>
 </main></body></html>
 """, autoescape=True).render(name=snapshot.name, promise=package.promise, beats=beat_cards, audience=audience, kimi=kimi[:1200])
