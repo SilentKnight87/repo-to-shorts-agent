@@ -29,6 +29,41 @@ The simple pitch:
 
 > Builders can make code work. Repo-to-Shorts helps them make people understand it.
 
+## Source links
+
+Official X announcement:
+
+```text
+https://x.com/NousResearch/status/2045225469088326039
+```
+
+Readable mirror used for rules extraction:
+
+```text
+https://en.rattibha.com/thread/2045225469088326039
+```
+
+Key official framing from the announcement:
+
+```text
+The Hermes Agent Creative Hackathon starts now
+16 Days, $25k in Prizes
+Presented by @Kimi_Moonshot & @NousResearch
+For the tinkerers pushing Hermes Agent into creative domains: video, image, audio, 3D, long-form writing, creative software, interactive media and more.
+Show us what your Hermes Agent can do.
+```
+
+Submission requirements:
+
+```text
+Submissions due EOD Sunday, May 3rd.
+Tweet a demo video tagging @NousResearch with a short writeup.
+Drop the link to the post in the creative-hackathon-submissions channel on the Nous Research Discord.
+Judged by Nous Research and Kimi on creativity, usefulness, and presentation.
+To qualify for the Kimi Track, prove use of Kimi models in the submission video.
+Submissions using Kimi models are eligible for both tracks.
+```
+
 ## Why this fits the Hermes Creative Hackathon
 
 The hackathon rewards creativity, usefulness, and presentation.
