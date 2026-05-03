@@ -63,7 +63,8 @@ a {{ margin-right: 10px; }}
 <input type="text" name="audience" value="{html.escape(DEFAULT_AUDIENCE)}">
 <label>Kimi model</label>
 <input type="text" name="kimi_model" value="{html.escape(DEFAULT_KIMI_MODEL)}">
-<label><input type="checkbox" name="render_mp4"> Render MP4</label>
+<label><input type="checkbox" name="render_mp4"> Render classic MP4</label><br>
+<label><input type="checkbox" name="creative_mode" checked> Creative short (animated + narrated)</label><br>
 <button type="submit">Generate short package</button>
 </form>
 <h2>Latest runs</h2>
@@ -85,6 +86,21 @@ def render_success_page(run_dir: Path, run_metadata: dict) -> str:
 
     kimi_info = run_metadata.get("kimi", {})
     render_info = run_metadata.get("render", {})
+    brief = run_metadata.get("creative_brief", {})
+
+    brief_html = ""
+    if brief:
+        scenes = brief.get("scenes", [])
+        scenes_html = "\n".join(
+            f'<li>{html.escape(s.get("visual_tool",""))}: {html.escape(s.get("narration",""))[:80]}...</li>'
+            for s in scenes
+        )
+        brief_html = f"""
+<h2>Creative brief ({html.escape(brief.get('style',''))})</h2>
+<p><strong>Title:</strong> {html.escape(brief.get('title',''))}</p>
+<p><strong>Hook:</strong> {html.escape(brief.get('hook',''))}</p>
+<ol>{scenes_html}</ol>
+"""
 
     return f"""<!doctype html>
 <html lang="en">
@@ -100,7 +116,8 @@ a {{ margin-right: 10px; }}
 <h1>Generation complete</h1>
 <p>Run: <code>{html.escape(str(run_dir))}</code></p>
 <p>Kimi: {html.escape(kimi_info.get("mode", "unknown"))}</p>
-<p>Render: {html.escape(render_info.get("status", "unknown"))}</p>
+<p>Render: {html.escape(render_info.get("mode", "unknown"))} / {html.escape(render_info.get("renderer", "unknown"))}</p>
+{brief_html}
 <ul>
 {"".join(artifacts)}
 </ul>
@@ -204,6 +221,7 @@ def _make_handler(runs_dir: Path):
                 audience = form.get("audience", [DEFAULT_AUDIENCE])[0].strip() or DEFAULT_AUDIENCE
                 kimi_model = form.get("kimi_model", [DEFAULT_KIMI_MODEL])[0].strip() or DEFAULT_KIMI_MODEL
                 render_mp4 = "render_mp4" in form
+                creative_mode = "creative_mode" in form
 
                 if not target:
                     self.send_response(400)
@@ -213,14 +231,24 @@ def _make_handler(runs_dir: Path):
                     return
 
                 try:
-                    render = "mp4" if render_mp4 else "none"
-                    run_dir = run_analysis(
-                        target,
-                        audience=audience,
-                        out_dir=runs_dir,
-                        kimi_model=kimi_model,
-                        render=render,
-                    )
+                    if creative_mode:
+                        from repo_to_shorts.hermes_skill import run_creative_pipeline
+                        result = run_creative_pipeline(
+                            target,
+                            audience=audience,
+                            out_dir=runs_dir,
+                            kimi_model=kimi_model,
+                        )
+                        run_dir = Path(result["run_dir"])
+                    else:
+                        render = "mp4" if render_mp4 else "none"
+                        run_dir = run_analysis(
+                            target,
+                            audience=audience,
+                            out_dir=runs_dir,
+                            kimi_model=kimi_model,
+                            render=render,
+                        )
                     metadata = json.loads((run_dir / "metadata.json").read_text())
                     page = render_success_page(run_dir, metadata).encode()
                     self.send_response(200)
