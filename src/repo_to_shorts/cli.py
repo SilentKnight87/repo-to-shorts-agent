@@ -32,15 +32,18 @@ def analyze(
     out: Path = typer.Option(DEFAULT_OUT, "--out", "-o", help="Directory where run folders are written."),
     force: bool = typer.Option(False, "--force", help="Overwrite an existing timestamped run directory if needed."),
     kimi_model: str | None = typer.Option(None, "--kimi-model", help="OpenRouter/Moonshot Kimi model name."),
+    render: str = typer.Option("none", "--render", help="Optional renderer: none or mp4."),
 ) -> None:
     """Analyze TARGET and create a launch-ready short-video package."""
     try:
-        run_dir = run_analysis(target, audience=audience, out_dir=out, force=force, kimi_model=kimi_model)
+        run_dir = run_analysis(target, audience=audience, out_dir=out, force=force, kimi_model=kimi_model, render=render)
     except Exception as exc:  # noqa: BLE001 - Typer should print concise CLI failures.
         raise typer.BadParameter(str(exc)) from exc
 
     console.print(f"[green]Created run:[/green] {run_dir}")
     console.print(f"[cyan]Open:[/cyan] {run_dir / 'demo.html'}")
+    if (run_dir / "demo.mp4").exists():
+        console.print(f"[cyan]MP4:[/cyan] {run_dir / 'demo.mp4'}")
     console.print("[cyan]Artifacts:[/cyan] repo brief, storyboard, SVG architecture, narration, captions, launch copy, Kimi critique")
 
 

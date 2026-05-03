@@ -15,6 +15,7 @@ Repo-to-Shorts turns a local Git repo or GitHub URL into a launch-ready short-vi
 - Discord submission copy
 - Kimi critic/editor pass
 - browser-recordable `demo.html`
+- optional 9:16 `demo.mp4`
 - recording instructions
 
 This is not a full video editor and does not currently publish anything externally.
@@ -28,6 +29,7 @@ src/repo_to_shorts/cli.py
   -> pipeline.build_story()
   -> kimi.critique_story()
   -> render Markdown/SVG/SRT/HTML artifacts into runs/<timestamp>-<repo>/
+  -> optional render.render_video() for --render mp4
 ```
 
 Key files:
@@ -36,8 +38,10 @@ Key files:
 - `src/repo_to_shorts/ingest.py`: local/GitHub repo snapshotting.
 - `src/repo_to_shorts/pipeline.py`: artifact generation pipeline.
 - `src/repo_to_shorts/kimi.py`: OpenRouter/Kimi critic adapter with deterministic fallback.
+- `src/repo_to_shorts/render.py`: optional Pillow + ffmpeg vertical MP4 renderer.
 - `tests/test_pipeline.py`: pipeline/CLI/integration coverage.
 - `tests/test_kimi.py`: Kimi adapter tests, mocked network only.
+- `tests/test_render.py`: renderer tests, with no real ffmpeg dependency except explicit smoke/golden runs.
 - `docs/HACKATHON_STRATEGY.md`: positioning and judging strategy.
 - `docs/PRD.md`: product requirements.
 - `docs/demo-script.md`: recording plan.
@@ -83,6 +87,7 @@ If a real key ever lands in git history, stop and rotate the key. Do not just de
 /opt/homebrew/bin/python3.13 -m venv .venv
 .venv/bin/python -m pip install --upgrade pip
 .venv/bin/python -m pip install -e '.[dev]'
+.venv/bin/python -m pip install -e '.[render]'  # optional MP4 support
 ```
 
 Run checks:
@@ -103,10 +108,20 @@ Generate a deterministic no-key run:
 Generate a live Kimi run, key provided via environment only:
 
 ```bash
-OPENROUTER_API_KEY="[REDACTED]" .venv/bin/repo-shorts analyze . \
+OPENROUTER_API_KEY="***" .venv/bin/repo-shorts analyze . \
   --audience "Nous Research Hermes Agent Creative Hackathon judges" \
   --out runs \
-  --kimi-model moonshotai/kimi-k2.6
+  --kimi-model moonshotai/kimi-k2.6 \
+  --render mp4
+```
+
+Generate an optional MP4 run, requires Pillow plus `ffmpeg`/`ffprobe`:
+
+```bash
+.venv/bin/repo-shorts analyze . \
+  --audience "Nous Research Hermes Agent Creative Hackathon judges" \
+  --out runs \
+  --render mp4
 ```
 
 ## Kimi behavior
@@ -121,6 +136,16 @@ OPENROUTER_API_KEY="[REDACTED]" .venv/bin/repo-shorts analyze . \
 
 Network calls must not run in tests. Use monkeypatch/mocks around `_call_openrouter_api()` or `urllib.request.urlopen`.
 
+## Render behavior
+
+`--render mp4` is optional. It must never break the default artifact-only path.
+
+- Keep renderer dependencies optional under the `render` extra.
+- Require `ffmpeg` and `ffprobe` for real MP4 generation.
+- Record render status in `metadata.json` under `render`.
+- Add `demo.mp4` to the artifact manifest only when MP4 rendering is requested.
+- Prefer simple, deterministic Pillow scene cards over fragile creative dependencies.
+
 ## Coding rules
 
 - Keep the golden path reliable without credentials.
@@ -128,7 +153,7 @@ Network calls must not run in tests. Use monkeypatch/mocks around `_call_openrou
 - Prefer small, tested changes over big rewrites.
 - Add tests before behavior changes.
 - Keep generated `runs/` out of git.
-- Keep docs truthful. If the code only creates a package, do not claim it renders a finished MP4.
+- Keep docs truthful. If the code only creates a package, do not claim it renders finished media. If `--render mp4` works, describe it as optional generated MP4, not a full video editor.
 
 ## Commit checklist
 
@@ -159,6 +184,6 @@ polish: improve demo artifact checklist
 1. Preserve live Kimi proof in generated artifacts.
 2. Keep the demo browser-recordable and legible.
 3. Make X/Discord copy concise and honest.
-4. Only add MP4 rendering if the above are already locked.
+4. Keep optional MP4 rendering honest and stable.
 
 Presentation beats clever machinery. Shipping beats architecture fan fiction.
