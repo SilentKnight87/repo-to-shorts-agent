@@ -1,209 +1,166 @@
 # Repo-to-Shorts Agent
 
-Turn a GitHub repo or local repo into a launch-ready technical short-video package.
+Turn any GitHub repo into a 60-second animated creative short. Built for the Nous Research Hermes Agent Creative Hackathon.
 
-Built for the Nous Research Hermes Agent Creative Hackathon as a polished MVP golden path: pass a repo target, get a repo brief, story arc, storyboard, architecture diagram, narration, captions, launch copy, Discord submission copy, Kimi critic notes, a browser-presentable demo artifact, and an optional creative short video.
+**The meta pitch:** The hackathon submission video will be a screen recording of this app, generating a video of itself.
 
-**NEW:** `repo-shorts creative` generates a 60-second animated creative short with Kimi 2.6 creative direction, animated visuals, and TTS narration. `repo-shorts web` launches a local browser UI.
+## How it works
 
-> Repo remains private. The tool does not publish or submit anything externally.
+1. **Paste a GitHub URL** into the web UI
+2. **Kimi 2.6 (Creative Director)** analyzes the repo and designs a creative brief: visual style, scene breakdown, narration script, pacing
+3. **Enhanced renderer** animates the scenes with gradients, fade reveals, typewriter text, and component architecture diagrams
+4. **TTS narration** (macOS `say`) reads the script and gets mixed into the video
+5. **Output:** a 1080×1920 vertical MP4, ready to post
 
-## Kimi + Hermes strategy
+All of this happens in one click through the browser.
 
-Repo-to-Shorts is a Hermes Agent creative workflow, not just a standalone Python script.
-
-The submission strategy is two-front Kimi usage:
-
-1. **Kimi 2.6 Creative Director** (`repo-shorts creative`): Kimi analyzes the repo and designs a creative brief (visual style, scene breakdown, narration, pacing) for a 60-second short.
-2. **Kimi Critic/Editor** (`repo-shorts analyze`): Kimi critiques the generated story package and suggests improvements.
-
-Both paths use OpenRouter with `moonshotai/kimi-k2.6`. Both have honest deterministic fallbacks when no API key is present.
-
-See:
-
-```text
-docs/HACKATHON_STRATEGY.md
-docs/PRD.md
-```
-
-## Install
-
-Use Python 3.13 from Homebrew on the hackathon machine:
-
-```bash
-/opt/homebrew/bin/python3.13 -m venv .venv
-.venv/bin/python -m pip install --upgrade pip
-.venv/bin/python -m pip install -e '.[dev]'
-
-# Optional MP4 renderer support (Pillow + ffmpeg)
-.venv/bin/python -m pip install -e '.[render]'
-```
-
-Requires system `ffmpeg` and `ffprobe` for video generation.
-
-## Quick start
-
-### Creative short (new)
-
-Generate a 60-second animated creative short with Kimi 2.6 creative direction:
-
-```bash
-repo-shorts creative . --audience "hackathon judges" --out runs
-```
-
-With live Kimi via OpenRouter:
-
-```bash
-export OPENROUTER_API_KEY="***"
-repo-shorts creative . \
-  --audience "Nous Research Hermes Agent Creative Hackathon judges" \
-  --out runs \
-  --kimi-model moonshotai/kimi-k2.6
-```
-
-### Classic analysis
-
-Generate the full artifact package (brief, storyboard, narration, etc.):
-
-```bash
-repo-shorts analyze <target> --audience "hackathon judges" --out runs --render mp4
-```
-
-### Local web UI
-
-Launch a browser form at `http://127.0.0.1:8765`:
+## Web UI (primary interface)
 
 ```bash
 repo-shorts web
 ```
 
-For LAN demo access:
+Opens `http://127.0.0.1:8765`:
+
+- Paste any GitHub URL or local path
+- Toggle **Creative short** (animated + narrated) or **Classic analysis** (artifact package)
+- Click Generate
+- Watch the creative brief appear, then download `demo.mp4`
+
+For LAN demo access (e.g., record from another device):
 
 ```bash
 repo-shorts web --host 0.0.0.0 --port 8765
 ```
 
-## Generated artifacts
-
-Each run writes a folder like `runs/20260501-012345-repo-to-shorts-agent/` containing:
-
-- `metadata.json` — run target, source type, audience, Kimi mode, artifact manifest.
-- `repo_brief.md` — README signal, package metadata, file tree summary, git log/diff when available.
-- `storyboard.md` — 60-second story arc with visuals.
-- `architecture.svg` — deterministic architecture diagram.
-- `narration.md` — voiceover script.
-- `captions.srt` — subtitle file for the golden-path short.
-- `x_post.md` — X-ready launch copy.
-- `submission.md` — Discord/hackathon submission copy.
-- `kimi_critique.md` — Kimi critic/script-editor pass or deterministic fallback.
-- `demo.html` — browser-presentable artifact designed for screen recording.
-- `demo.mp4` — optional 9:16 video export when run with `--render mp4`.
-- `recording_instructions.md` — practical capture checklist.
-
-## Creative mode
-
-The `repo-shorts creative` command generates a produced 60-second creative short:
-
-1. **Ingest** the repo (same as `analyze`)
-2. **Kimi 2.6 Creative Director** designs a creative brief with style, scene breakdown, narration, and pacing
-3. **Enhanced renderer** animates each scene with gradients, fades, typewriter effects, and component reveals
-4. **TTS narration** is generated via macOS `say` and merged into the final video
-5. **Metadata** proves Kimi directed the brief
-
-Output:
-- `demo.mp4` — 1080×1920 vertical, 60s, h264 + aac
-- `metadata.json` — includes `creative_brief` and `kimi.mode` proof
-
-Renderer: `pillow+ffmpeg-enhanced` (animated frames, not static slides)
+## Install
 
 ```bash
-repo-shorts creative . \
-  --audience "Nous Research Hermes Agent Creative Hackathon judges" \
-  --out runs \
-  --kimi-model moonshotai/kimi-k2.6 \
-  --music bg_track.mp3
+/opt/homebrew/bin/python3.13 -m venv .venv
+.venv/bin/python -m pip install --upgrade pip
+.venv/bin/python -m pip install -e '.[dev,render]'
 ```
 
-## Optional classic MP4 export
+Requires system `ffmpeg` and `ffprobe`.
 
-The `repo-shorts analyze --render mp4` path creates a simpler vertical slideshow:
+## API key setup
+
+Create `.env` in the project root:
 
 ```bash
-repo-shorts analyze . \
-  --audience "Nous Research Hermes Agent Creative Hackathon judges" \
-  --out runs \
-  --kimi-model moonshotai/kimi-k2.6 \
-  --render mp4
+OPENROUTER_API_KEY=sk-or-v1-...
 ```
 
-Requirements:
+If no key is present, the tool uses a deterministic fallback. It still produces a video, but the creative brief is templated rather than Kimi-designed. The metadata.json always records which mode was used.
 
-- Python extra: `pip install -e '.[render]'`
-- System binaries: `ffmpeg` and `ffprobe`
+## CLI (optional)
 
-The renderer creates Pillow scene cards, stitches them with ffmpeg, and writes render proof into `metadata.json`:
+The web UI wraps the same engine. CLI exists for scripting:
+
+```bash
+# Creative short via CLI
+repo-shorts creative https://github.com/owner/repo --out runs
+
+# Classic artifact package
+repo-shorts analyze https://github.com/owner/repo --out runs --render mp4
+```
+
+## Architecture
+
+```
+GitHub URL
+    |
+    v
+[ Ingest ]  -> README, file tree, metadata, git log
+    |
+    v
+[ Creative Director ]  -> Kimi 2.6 designs brief (style, scenes, narration)
+    |
+    v
+[ Renderer ]  -> Pillow generates 1800 animated frames (60s @ 30fps)
+    |              gradients, fades, typewriter, component reveals
+    v
+[ Compositor ]  -> ffmpeg stitches frames + TTS narration -> demo.mp4
+    |
+    v
+[ Metadata ]  -> metadata.json proves Kimi mode + creative brief
+```
+
+## Creative brief structure
+
+Kimi 2.6 outputs a JSON brief like:
 
 ```json
-"render": {
-  "mode": "mp4",
-  "status": "success",
-  "renderer": "pillow+ffmpeg",
-  "output": "demo.mp4",
-  "scene_count": 5,
-  "error": null
+{
+  "style": "dark-terminal",
+  "title": "repo-to-shorts-agent: What It Builds",
+  "hook": "One repo. Infinite possibilities.",
+  "scenes": [
+    {
+      "duration_seconds": 8,
+      "visual_tool": "pretext",
+      "narration": "repo-to-shorts-agent — let's see what it builds.",
+      "music_mood": "tension",
+      "transition": "fade"
+    }
+  ],
+  "music_mood": "electronic",
+  "total_duration": 60
 }
 ```
 
-## How it works
+Styles: `dark-terminal`, `clean-academic`, `playful`, `cinematic`
 
-```text
-local repo or GitHub URL
-  -> ingest README, file tree, package metadata, git log/diff
-  -> deterministic story package OR Kimi creative brief
-  -> enhanced animation renderer (Pillow + ffmpeg)
-  -> TTS narration + optional music
-  -> final demo.mp4 with metadata proof
-```
+Visual tools: `manim` (code viz), `pretext` (typography), `ascii` (code art), `svg` (architecture)
 
-The MVP deliberately favors one reliable, deterministic golden path over a generic media platform. It is safe to run without model credentials.
+## Generated artifacts
+
+Each run creates `runs/<timestamp>-<repo>/`:
+
+- `demo.mp4` — the final 60s creative short
+- `metadata.json` — proof of Kimi mode, creative brief, render details
+- `video_raw.mp4` — video without audio (for remixing)
+- `manim_scene_descriptor.json` — the scene script fed to the renderer
+
+For classic analysis mode, also generates: repo brief, storyboard, architecture SVG, narration script, captions, X/Discord copy, Kimi critique.
 
 ## Kimi usage
 
-### Creative Director (`repo-shorts creative`)
+**Creative Director** (`repo-shorts creative` / web UI creative mode):
+- Kimi 2.6 analyzes repo context and designs the full creative brief
+- Requires `OPENROUTER_API_KEY`
+- Fallback: deterministic template when no key
 
-Kimi 2.6 analyzes the repo and outputs a structured creative brief:
-- `style`: dark-terminal, clean-academic, playful, or cinematic
-- `scenes`: 4-6 scenes with duration, visual tool, narration, music mood, transition
-- `hook`: punchy opening line
+**Critic/Editor** (`repo-shorts analyze`):
+- Kimi reviews the generated story package and suggests improvements
+- Same key requirement and fallback behavior
 
-### Critic/Editor (`repo-shorts analyze`)
-
-Kimi critiques the generated story package and suggests improvements.
-
-Default live mode uses OpenRouter with Kimi 2.6:
-
-```bash
-export OPENROUTER_API_KEY="***"
-repo-shorts analyze . \
-  --audience "Nous Research Hermes Agent Creative Hackathon judges" \
-  --out runs \
-  --kimi-model moonshotai/kimi-k2.6 \
-  --render mp4
-```
-
-If `OPENROUTER_API_KEY`/`KIMI_API_KEY` is absent, the tool writes a deterministic fallback and records that honestly in `metadata.json`. If the API call fails, it records `api-error-fallback` rather than pretending the run was live.
+Both modes record honest metadata:
+- `kimi.mode`: `live-api`, `deterministic-fallback`, or `api-error-fallback`
+- `kimi.model`: `moonshotai/kimi-k2.6`
+- `kimi.provider`: `openrouter`
 
 ## Development
 
 ```bash
-.venv/bin/python -m pytest -q
-.venv/bin/ruff check .
-repo-shorts creative . --out runs --force
-repo-shorts analyze . --out runs --render mp4 --force
+.venv/bin/python -m pytest -q        # 53 tests
+.venv/bin/ruff check .               # lint
+repo-shorts web                      # start UI
 ```
 
-## Hackathon demo angle
+## Hackathon submission
 
-Most technical projects die in the gap between "it works" and "people understand why it matters." Repo-to-Shorts Agent closes that gap by turning code context into a ready-to-record launch package.
+**The meta demo:** Screen-record the web UI generating a creative short of the Repo-to-Shorts Agent repo itself. The submission video shows the app building a video of the app.
 
-The creative mode goes further: instead of static slides, it produces an animated, narrated short with creative direction from Kimi 2.6 — proving that agentic AI can orchestrate the entire creative workflow from repo analysis to final video.
+**Proof points:**
+1. Open web UI, paste `https://github.com/SilentKnight87/repo-to-shorts-agent`
+2. Click Generate
+3. Show creative brief appearing in real-time
+4. Play the generated `demo.mp4`
+5. Open `metadata.json` to show `kimi.mode: live-api` and full `creative_brief`
+
+**What to submit:**
+- Demo video (screen recording of the web UI + generated MP4)
+- Short write-up explaining the agentic creative workflow
+- Tag @NousResearch, @KimiAI, and relevant parties
+- The repo itself (already public)

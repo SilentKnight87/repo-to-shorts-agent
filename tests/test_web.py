@@ -12,8 +12,6 @@ import pytest
 
 from repo_to_shorts import web as web_module
 from repo_to_shorts.web import (
-    DEFAULT_AUDIENCE,
-    DEFAULT_KIMI_MODEL,
     _make_handler,
     list_runs,
     render_home_page,
@@ -127,11 +125,64 @@ class TestGenerate:
         finally:
             _stop_server(server)
 
-    def test_generate_defaults_when_optional_fields_blank(self, tmp_path: Path, monkeypatch):
-        calls = []
+    def test_generate_creative_mode(self, tmp_path: Path, monkeypatch):
+        creative_calls = []
+        analyze_calls = []
+
+        def fake_run_creative_pipeline(target, audience, out_dir, **kwargs):
+            creative_calls.append({"target": target, "audience": audience, "out_dir": out_dir, **kwargs})
+            run_dir = tmp_path / "20260503-092819-fake-repo"
+            run_dir.mkdir(parents=True, exist_ok=True)
+            metadata = {
+                "artifacts": ["demo.mp4", "metadata.json"],
+                "kimi": {"mode": "live-api"},
+                "render": {"mode": "mp4", "renderer": "pillow+ffmpeg-enhanced"},
+                "creative_brief": {"style": "dark-terminal", "title": "Test", "hook": "Hook", "scenes": []},
+            }
+            (run_dir / "metadata.json").write_text(json.dumps(metadata))
+            return {"output": str(run_dir / "demo.mp4"), "run_dir": str(run_dir)}
 
         def fake_run_analysis(target, audience, out_dir, **kwargs):
-            calls.append({"target": target, "audience": audience, "out_dir": out_dir, **kwargs})
+            analyze_calls.append({"target": target, "audience": audience, "out_dir": out_dir, **kwargs})
+            run_dir = tmp_path / "20260503-092819-fake-repo"
+            run_dir.mkdir(parents=True, exist_ok=True)
+            metadata = {
+                "artifacts": ["demo.html", "metadata.json"],
+                "kimi": {"mode": "live-api"},
+                "render": {"status": "success"},
+            }
+            (run_dir / "metadata.json").write_text(json.dumps(metadata))
+            return run_dir
+
+        monkeypatch.setattr(web_module, "run_analysis", fake_run_analysis)
+        monkeypatch.setattr("repo_to_shorts.hermes_skill.run_creative_pipeline", fake_run_creative_pipeline)
+
+        server, port = _start_server(tmp_path)
+        try:
+            data = urllib.parse.urlencode({
+                "target": "https://github.com/owner/repo",
+                "audience": "hackathon judges",
+                "kimi_model": "moonshotai/kimi-k2.6",
+                "creative_mode": "on",
+            }).encode()
+            req = urllib.request.Request(f"http://127.0.0.1:{port}/generate", data=data, method="POST")
+            with urllib.request.urlopen(req) as resp:
+                assert resp.status == 200
+                body = resp.read().decode()
+                assert "Generation complete" in body
+                assert "Creative brief" in body
+        finally:
+            _stop_server(server)
+
+        assert len(creative_calls) == 1
+        assert len(analyze_calls) == 0
+        assert creative_calls[0]["target"] == "https://github.com/owner/repo"
+
+    def test_generate_classic_mode_when_creative_unchecked(self, tmp_path: Path, monkeypatch):
+        analyze_calls = []
+
+        def fake_run_analysis(target, audience, out_dir, **kwargs):
+            analyze_calls.append({"target": target, "audience": audience, "out_dir": out_dir, **kwargs})
             run_dir = tmp_path / "20260503-092819-fake-repo"
             run_dir.mkdir(parents=True, exist_ok=True)
             metadata = {
@@ -146,17 +197,20 @@ class TestGenerate:
 
         server, port = _start_server(tmp_path)
         try:
-            data = urllib.parse.urlencode({"target": "local/path"}).encode()
+            # creative_mode NOT included in form data
+            data = urllib.parse.urlencode({
+                "target": "local/path",
+                "audience": "technical builders",
+                "kimi_model": "moonshotai/kimi-k2.6",
+            }).encode()
             req = urllib.request.Request(f"http://127.0.0.1:{port}/generate", data=data, method="POST")
             with urllib.request.urlopen(req) as resp:
                 assert resp.status == 200
         finally:
             _stop_server(server)
 
-        assert len(calls) == 1
-        assert calls[0]["audience"] == DEFAULT_AUDIENCE
-        assert calls[0]["kimi_model"] == DEFAULT_KIMI_MODEL
-        assert calls[0]["render"] == "none"
+        assert len(analyze_calls) == 1
+        assert analyze_calls[0]["render"] == "none"
 
 
 class TestPathTraversal:
