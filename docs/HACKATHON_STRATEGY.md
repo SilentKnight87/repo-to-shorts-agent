@@ -83,8 +83,9 @@ Repo-to-Shorts maps cleanly:
 3. Presentation
    - The demo has an obvious before/after:
      - Before: repo full of files.
-     - After: clear story, architecture visual, captions, copy, Kimi critique, and demo artifact.
+     - After: clear story, architecture visual, captions, copy, Kimi critique, browser demo, and optional MP4.
    - Judges can understand the transformation in under 10 seconds.
+   - Current caveat: the browser currently serves generated artifacts. It is not yet an interactive paste-a-URL product UI.
 
 ## The two-front Kimi strategy
 
@@ -291,14 +292,13 @@ This has a real shot if the final submission proves:
 
 ## Immediate execution path
 
-1. Wire live Kimi API inside `repo_to_shorts.kimi`.
-2. Add metadata proving live Kimi mode.
-3. Add docs showing how to run Hermes with Kimi as the orchestration model.
-4. Package Repo-to-Shorts as a Hermes-friendly workflow/skill.
-5. Regenerate demo artifacts.
-6. Screen-record polished `demo.html` unless MP4 render becomes easy.
-7. Tighten X/Discord copy.
-8. Submit only after maintainer approves.
+0. Stop moving blind: keep `docs/PRD.md`, `docs/implementation-plan.md`, and `docs/plans/` aligned with actual shipped behavior.
+1. Review the local web UI plan in `docs/plans/2026-05-03-local-web-ui-plan.md`.
+2. If approved, build the smallest possible local web UI around existing `run_analysis(...)`.
+3. Generate a fresh live Kimi + MP4 golden run.
+4. Record the demo showing the UI or CLI input, generated folder, `metadata.json`, `kimi_critique.md`, `demo.html`, and `demo.mp4`.
+5. Tighten X/Discord copy.
+6. Submit only after maintainer approves.
 
 ## Final submission positioning
 
@@ -323,5 +323,5 @@ The workflow uses Hermes Agent as the orchestration harness: repo ingestion, sto
 
 Kimi is used on two fronts: as the model powering the Hermes harness where available, and as an explicit critic/script-editor stage inside the product. The generated Kimi critique sharpens the hook, narration, risk notes, and final CTA.
 
-Output includes repo brief, storyboard, architecture SVG, narration, captions, X post, Discord copy, Kimi critique, and a browser-recordable demo page.
+Output includes repo brief, storyboard, architecture SVG, narration, captions, X post, Discord copy, Kimi critique, browser demo page, and optional MP4 render.
 ```

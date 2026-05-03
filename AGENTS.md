@@ -46,6 +46,7 @@ Key files:
 - `docs/PRD.md`: product requirements.
 - `docs/demo-script.md`: recording plan.
 - `docs/submission-copy.md`: X/Discord copy.
+- `docs/plans/2026-05-03-local-web-ui-plan.md`: next planned feature, a minimal local browser UI around the existing CLI engine.
 
 ## Environment and secrets
 
@@ -146,6 +147,19 @@ Network calls must not run in tests. Use monkeypatch/mocks around `_call_openrou
 - Add `demo.mp4` to the artifact manifest only when MP4 rendering is requested.
 - Prefer simple, deterministic Pillow scene cards over fragile creative dependencies.
 
+## Planned web UI behavior
+
+The web UI is not implemented yet. When added, it should wrap `pipeline.run_analysis(...)`; it must not fork the generation logic.
+
+Safe defaults:
+- default host: `127.0.0.1`
+- explicit LAN demo: `--host 0.0.0.0`
+- API keys stay in environment variables only
+- no database
+- no external publishing
+
+See `docs/plans/2026-05-03-local-web-ui-plan.md` before building.
+
 ## Coding rules
 
 - Keep the golden path reliable without credentials.
@@ -182,8 +196,9 @@ polish: improve demo artifact checklist
 ## Hackathon priority order
 
 1. Preserve live Kimi proof in generated artifacts.
-2. Keep the demo browser-recordable and legible.
-3. Make X/Discord copy concise and honest.
-4. Keep optional MP4 rendering honest and stable.
+2. Review and follow the local web UI plan before implementation.
+3. Keep the demo browser-recordable and legible.
+4. Make X/Discord copy concise and honest.
+5. Keep optional MP4 rendering honest and stable.
 
 Presentation beats clever machinery. Shipping beats architecture fan fiction.

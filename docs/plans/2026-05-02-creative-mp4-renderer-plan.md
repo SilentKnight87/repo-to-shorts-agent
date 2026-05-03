@@ -1,5 +1,7 @@
 # Creative MP4 Renderer Implementation Plan
 
+> Historical status, May 3: this plan has been executed for the MVP path. The shipped renderer uses Pillow scene cards plus ffmpeg/ffprobe behind `--render mp4`, records render metadata, and keeps default artifact generation safe. Current truth lives in `docs/PRD.md` and `README.md`.
+
 > **For Hermes:** Use subagent-driven-development skill to implement this plan task-by-task.
 
 **Goal:** Evolve Repo-to-Shorts Agent from a launch-asset generator into a creative Hermes/Kimi-directed workflow that emits a real, postable MP4 video.

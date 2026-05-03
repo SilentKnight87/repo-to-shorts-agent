@@ -1,5 +1,7 @@
 # Live Kimi + Render Implementation Plan
 
+> Historical status, May 3: this plan has mostly been executed. The shipped implementation uses OpenRouter model `moonshotai/kimi-k2.6`, structured Kimi metadata, and optional Pillow + ffmpeg MP4 rendering. Treat older Moonshot direct API names in this file as planning context, not current commands. Current truth lives in `docs/PRD.md` and `README.md`.
+
 > **For Hermes:** Use subagent-driven-development skill to implement this plan task-by-task.
 
 **Goal:** Upgrade Repo-to-Shorts from a deterministic browser-recordable package generator into an honest hackathon MVP with live Kimi critique support, Hermes harness positioning, and an optional MP4 render path.
@@ -268,8 +270,8 @@ def test_critique_story_uses_live_kimi_when_key_present(monkeypatch, tmp_path: P
 **Step 3: Implement `_call_kimi_api()`**
 
 ```python
-DEFAULT_KIMI_MODEL = "kimi-k2-0905-preview"
-DEFAULT_KIMI_BASE_URL = "https://api.moonshot.ai/v1"
+DEFAULT_KIMI_MODEL = "moonshotai/kimi-k2.6"
+DEFAULT_KIMI_BASE_URL = "https://openrouter.ai/api/v1"
 
 
 def _call_kimi_api(prompt: str, model: str) -> str:

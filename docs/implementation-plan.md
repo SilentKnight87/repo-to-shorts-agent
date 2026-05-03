@@ -1,127 +1,107 @@
 # Repo-to-Shorts Agent Implementation Plan
 
-> **For Hermes:** Use subagent-driven-development skill to implement this plan task-by-task.
+> **For Hermes:** Use subagent-driven-development skill to implement plans task-by-task.
 
-**Goal:** Build one polished end-to-end workflow that turns a repo into a launch-ready technical short video package.
+**Goal:** Track the actual implementation plan for Repo-to-Shorts without pretending old milestones are still open.
 
-**Architecture:** Start with a CLI-first pipeline. Each stage writes markdown/JSON artifacts to `runs/<slug>/`, making the demo visible and debuggable. Rendering can be simple HTML/frames + screen recording if MP4 rendering gets spicy.
+**Architecture:** Keep the CLI pipeline as the canonical engine. Layer optional interfaces, renderers, and final-mile submission flows on top of `run_analysis(...)` instead of forking logic.
 
-**Tech Stack:** Python, Typer, Jinja2, Mermaid/SVG or Excalidraw-style diagrams, ffmpeg/moviepy optional, Kimi/LLM call optional via provider adapter.
+**Tech Stack:** Python 3.13, Typer, Jinja2, Pillow, ffmpeg/ffprobe, OpenRouter Kimi 2.6, pytest, Ruff, optional future stdlib local web server.
 
 ---
 
-## Winning Demo Path
+## Current shipped system
 
-Input: a small repo URL or local path.
+Input:
+
+```text
+local repo path or public GitHub URL
+```
 
 Output:
 
-- `runs/<slug>/repo_brief.md`
-- `runs/<slug>/storyboard.md`
-- `runs/<slug>/architecture.svg`
-- `runs/<slug>/narration.md`
-- `runs/<slug>/x_post.md`
-- `runs/<slug>/video_plan.md`
-- optional `runs/<slug>/demo.mp4`
-
-## Tasks
-
-### Task 1: Create CLI skeleton
-
-**Objective:** Provide `repo-shorts analyze <path-or-url>` that creates a run folder.
-
-**Files:**
-- Create: `pyproject.toml`
-- Create: `src/repo_to_shorts/__init__.py`
-- Create: `src/repo_to_shorts/cli.py`
-
-**Verification:**
-
-```bash
-python -m repo_to_shorts.cli analyze .
+```text
+runs/<timestamp>-<repo>/metadata.json
+runs/<timestamp>-<repo>/repo_brief.md
+runs/<timestamp>-<repo>/storyboard.md
+runs/<timestamp>-<repo>/architecture.svg
+runs/<timestamp>-<repo>/narration.md
+runs/<timestamp>-<repo>/captions.srt
+runs/<timestamp>-<repo>/x_post.md
+runs/<timestamp>-<repo>/submission.md
+runs/<timestamp>-<repo>/kimi_critique.md
+runs/<timestamp>-<repo>/demo.html
+runs/<timestamp>-<repo>/recording_instructions.md
+runs/<timestamp>-<repo>/demo.mp4, if --render mp4 succeeds
 ```
 
-Expected: run folder exists with metadata.
-
-### Task 2: Repo ingestion
-
-**Objective:** Read README, file tree, package metadata, and recent git diff/log when local.
-
-**Files:**
-- Create: `src/repo_to_shorts/ingest.py`
-- Test: `tests/test_ingest.py`
-
-**Verification:**
+Current command:
 
 ```bash
-pytest tests/test_ingest.py -v
+OPENROUTER_API_KEY="***" .venv/bin/repo-shorts analyze . \
+  --audience "Nous Research Hermes Agent Creative Hackathon judges" \
+  --out runs \
+  --kimi-model moonshotai/kimi-k2.6 \
+  --render mp4
 ```
 
-Expected: extracts README and top-level file map.
+## Completed milestone plans
 
-### Task 3: Story generator
+1. `docs/plans/2026-05-01-live-kimi-render-plan.md`
+   - live OpenRouter/Kimi critic adapter
+   - structured Kimi metadata
+   - honest fallback behavior
 
-**Objective:** Convert repo facts into problem/audience/architecture/outcome narrative.
+2. `docs/plans/2026-05-02-creative-mp4-renderer-plan.md`
+   - optional `--render mp4`
+   - Pillow scene cards
+   - ffmpeg MP4 render
+   - render metadata
 
-**Files:**
-- Create: `src/repo_to_shorts/story.py`
-- Create: `templates/story_prompt.md`
+## Next active plan
 
-**Verification:**
+3. `docs/plans/2026-05-03-local-web-ui-plan.md`
+   - local browser form
+   - Generate button
+   - latest runs list
+   - artifact links
+   - local-only safe defaults
 
-Run CLI and inspect `storyboard.md`.
+## Current vs target
 
-### Task 4: Visual asset generator
+| Capability | Current | Target next |
+| --- | --- | --- |
+| CLI generation | Built | keep stable |
+| Live Kimi | Built | show fresh `live-api` proof in final run |
+| MP4 render | Built | expose checkbox in web UI |
+| Static viewing | Works via ad hoc server | fold into local web command |
+| Browser form | Not built | build minimal local form |
+| Job status | Not built | synchronous success/error page first |
+| Submission posting | Not built | manual, after maintainer approves |
 
-**Objective:** Produce architecture SVG and 5-7 slide/card frames.
+## Scope rules
 
-**Files:**
-- Create: `src/repo_to_shorts/visuals.py`
-- Create: `templates/architecture.svg.j2`
-- Create: `templates/frame.html.j2`
-
-**Verification:**
-
-Open generated SVG/HTML locally.
-
-### Task 5: Kimi critic pass
-
-**Objective:** Add a visible critic/editor stage using Kimi, or a provider adapter that can be wired to Kimi.
-
-**Files:**
-- Create: `src/repo_to_shorts/critic.py`
-- Create: `templates/critic_prompt.md`
-
-**Verification:**
-
-`runs/<slug>/kimi_critique.md` shows recommendations and applied changes.
-
-### Task 6: Render/export
-
-**Objective:** Produce either MP4 or browser-presentable HTML with recording instructions.
-
-**Files:**
-- Create: `src/repo_to_shorts/render.py`
-
-**Verification:**
-
-Final artifact exists at `runs/<slug>/demo.html` or `demo.mp4`.
-
-### Task 7: Submission package
-
-**Objective:** Generate final X post, Discord submission blurb, and 60-90 sec demo script.
-
-**Files:**
-- Create: `templates/x_post.md`
-- Create: `templates/submission.md`
-
-**Verification:**
-
-All copy is saved under `runs/<slug>/submission/`.
-
-## Scope Rules
-
-- One golden path beats a generic tool.
-- Use static templates when LLM integration slows down.
-- If MP4 rendering blocks, ship HTML + screen recording.
+- One golden path beats a generic platform.
+- CLI remains canonical.
+- Web UI wraps `run_analysis(...)`, it does not duplicate generation logic.
+- Use static/server-rendered HTML first. No React swamp.
+- API keys come from environment variables only.
+- If web UI slows down final submission, fall back to CLI demo plus generated MP4.
 - Demo must show the agent working, not just the final artifact.
+
+## Verification commands
+
+```bash
+.venv/bin/python -m pytest -q
+.venv/bin/ruff check .
+.venv/bin/repo-shorts analyze . --audience "hackathon judges" --out runs --render mp4
+```
+
+## Final-mile order
+
+1. Review the web UI plan.
+2. Implement only the minimal local UI if approved.
+3. Generate fresh live Kimi + MP4 golden run.
+4. Record demo showing input, generation, metadata proof, Kimi critique, and output.
+5. Tighten X/Discord copy.
+6. Submit only after maintainer approves.
