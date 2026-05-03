@@ -16,3 +16,12 @@ def test_web_help_shows_host_and_port(monkeypatch):
     assert "--host" in result.output
     assert "--port" in result.output
     assert "127.0.0.1" in result.output
+
+
+def test_creative_help_shows_options():
+    result = runner.invoke(app, ["creative", "--help"])
+    assert result.exit_code == 0
+    assert "--audience" in result.output
+    assert "--kimi-model" in result.output
+    assert "--music" in result.output
+    assert "Generate a creative short" in result.output

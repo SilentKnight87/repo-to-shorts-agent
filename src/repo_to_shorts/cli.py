@@ -54,5 +54,32 @@ def web(host: str = "127.0.0.1", port: int = 8765) -> None:
     run_web_server(host=host, port=port)
 
 
+@app.command()
+def creative(
+    target: str = typer.Argument(..., help="Local repo path or GitHub URL."),
+    audience: str = typer.Option("technical builders", "--audience", "-a", help="Audience for the short."),
+    out: Path = typer.Option(DEFAULT_OUT, "--out", "-o", help="Directory where run folders are written."),
+    kimi_model: str | None = typer.Option(None, "--kimi-model", help="OpenRouter/Moonshot Kimi model name."),
+    music: Path | None = typer.Option(None, "--music", help="Optional background music MP3 file."),
+) -> None:
+    """Generate a creative short video with Kimi 2.6 creative direction."""
+    from repo_to_shorts.hermes_skill import run_creative_pipeline
+
+    try:
+        result = run_creative_pipeline(
+            target,
+            audience=audience,
+            out_dir=out,
+            kimi_model=kimi_model,
+            music_path=music,
+        )
+    except Exception as exc:  # noqa: BLE001
+        raise typer.BadParameter(str(exc)) from exc
+
+    console.print(f"[green]Creative short generated:[/green] {result['output']}")
+    console.print(f"[cyan]Run dir:[/cyan] {result['run_dir']}")
+    console.print("[cyan]Proof:[/cyan] metadata.json shows kimi.mode and creative brief")
+
+
 if __name__ == "__main__":
     app()
