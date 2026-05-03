@@ -114,7 +114,74 @@ def test_run_analysis_writes_launch_ready_artifact_set(tmp_path: Path):
     }
     assert "Sample Repo" in (run_dir / "repo_brief.md").read_text(encoding="utf-8")
     assert "Kimi critic" in (run_dir / "kimi_critique.md").read_text(encoding="utf-8")
+    assert metadata["render"] == {"mode": "none", "status": "skipped", "renderer": None, "output": None, "scene_count": 0, "error": None}
     assert "<!doctype html>" in (run_dir / "demo.html").read_text(encoding="utf-8").lower()
+
+
+def test_run_analysis_with_mp4_render_adds_demo_mp4_and_metadata(tmp_path: Path, monkeypatch):
+    repo = make_sample_repo(tmp_path)
+    out = tmp_path / "runs"
+
+    def fake_render_video(run_dir, scenes, config=None):
+        output = Path(run_dir) / "demo.mp4"
+        output.write_bytes(b"fake mp4")
+        return type(
+            "RenderResult",
+            (),
+            {"output_path": output, "mode": "mp4", "renderer": "pillow+ffmpeg", "scene_count": len(scenes), "error": None},
+        )()
+
+    monkeypatch.setattr("repo_to_shorts.pipeline.render_video", fake_render_video)
+
+    run_dir = run_analysis(str(repo), audience="Python builders", out_dir=out, render="mp4")
+
+    assert (run_dir / "demo.mp4").exists()
+    metadata = json.loads((run_dir / "metadata.json").read_text(encoding="utf-8"))
+    assert "demo.mp4" in metadata["artifacts"]
+    assert metadata["render"] == {
+        "mode": "mp4",
+        "status": "success",
+        "renderer": "pillow+ffmpeg",
+        "output": "demo.mp4",
+        "scene_count": 5,
+        "error": None,
+    }
+
+
+def test_run_analysis_with_failed_mp4_render_keeps_core_artifacts_and_records_failure(tmp_path: Path, monkeypatch):
+    repo = make_sample_repo(tmp_path)
+    out = tmp_path / "runs"
+
+    def fake_render_video(run_dir, scenes, config=None):
+        raise RuntimeError("ffmpeg exploded")
+
+    monkeypatch.setattr("repo_to_shorts.pipeline.render_video", fake_render_video)
+
+    run_dir = run_analysis(str(repo), audience="Python builders", out_dir=out, render="mp4")
+
+    assert (run_dir / "demo.html").exists()
+    assert not (run_dir / "demo.mp4").exists()
+    metadata = json.loads((run_dir / "metadata.json").read_text(encoding="utf-8"))
+    assert "demo.mp4" not in metadata["artifacts"]
+    assert metadata["render"] == {
+        "mode": "mp4",
+        "status": "failed",
+        "renderer": "pillow+ffmpeg",
+        "output": None,
+        "scene_count": 5,
+        "error": "ffmpeg exploded",
+    }
+
+
+def test_run_analysis_rejects_invalid_render_mode(tmp_path: Path):
+    repo = make_sample_repo(tmp_path)
+
+    try:
+        run_analysis(str(repo), audience="Python builders", out_dir=tmp_path / "runs", render="gif")
+    except ValueError as exc:
+        assert "render" in str(exc)
+    else:
+        raise AssertionError("expected invalid render mode to fail")
 
 
 def test_render_demo_html_escapes_untrusted_repo_story_audience_and_kimi_content(tmp_path: Path):
@@ -146,10 +213,21 @@ def test_render_demo_html_escapes_untrusted_repo_story_audience_and_kimi_content
     assert "&lt;iframe srcdoc=" in demo_html
 
 
-def test_cli_analyze_smoke_writes_artifacts_to_requested_out_dir(tmp_path: Path):
+def test_cli_analyze_smoke_writes_artifacts_to_requested_out_dir(tmp_path: Path, monkeypatch):
     repo = make_sample_repo(tmp_path)
     out = tmp_path / "custom-runs"
     runner = CliRunner()
+
+    def fake_render_video(run_dir, scenes, config=None):
+        output = Path(run_dir) / "demo.mp4"
+        output.write_bytes(b"fake mp4")
+        return type(
+            "RenderResult",
+            (),
+            {"output_path": output, "mode": "mp4", "renderer": "pillow+ffmpeg", "scene_count": len(scenes), "error": None},
+        )()
+
+    monkeypatch.setattr("repo_to_shorts.pipeline.render_video", fake_render_video)
 
     result = runner.invoke(
         app,
@@ -162,6 +240,8 @@ def test_cli_analyze_smoke_writes_artifacts_to_requested_out_dir(tmp_path: Path)
             str(out),
             "--kimi-model",
             "moonshotai/kimi-k2.6",
+            "--render",
+            "mp4",
         ],
     )
 
@@ -171,3 +251,4 @@ def test_cli_analyze_smoke_writes_artifacts_to_requested_out_dir(tmp_path: Path)
     assert len(run_dirs) == 1
     assert (run_dirs[0] / "demo.html").exists()
     assert (run_dirs[0] / "metadata.json").exists()
+    assert "MP4:" in result.output

@@ -30,6 +30,9 @@ Use Python 3.13 from Homebrew on the hackathon machine:
 /opt/homebrew/bin/python3.13 -m venv .venv
 .venv/bin/python -m pip install --upgrade pip
 .venv/bin/python -m pip install -e '.[dev]'
+
+# Optional MP4 renderer support
+.venv/bin/python -m pip install -e '.[render]'
 ```
 
 ## CLI
@@ -56,6 +59,7 @@ Options:
 - `--out`, `-o`: output directory for timestamped run folders. Default: `runs`.
 - `--force`: allow overwriting an existing timestamped run directory if one collides.
 - `--kimi-model`: OpenRouter/Moonshot Kimi model name. Default: `moonshotai/kimi-k2.6`.
+- `--render`: optional renderer. Use `none` for artifact-only output or `mp4` for a 9:16 `demo.mp4` built with Pillow + ffmpeg.
 
 ## Generated artifacts
 
@@ -71,7 +75,38 @@ Each run writes a folder like `runs/20260501-012345-repo-to-shorts-agent/` conta
 - `submission.md` — Discord/hackathon submission copy.
 - `kimi_critique.md` — Kimi critic/script-editor pass or deterministic fallback.
 - `demo.html` — browser-presentable artifact designed for screen recording.
+- `demo.mp4` — optional 9:16 video export when run with `--render mp4`.
 - `recording_instructions.md` — practical capture checklist.
+
+## Optional MP4 export
+
+The default run remains lightweight and browser-first. Add `--render mp4` when you want a generated vertical video file:
+
+```bash
+repo-shorts analyze . \
+  --audience "Nous Research Hermes Agent Creative Hackathon judges" \
+  --out runs \
+  --kimi-model moonshotai/kimi-k2.6 \
+  --render mp4
+```
+
+Requirements:
+
+- Python extra: `pip install -e '.[render]'`
+- System binaries: `ffmpeg` and `ffprobe`
+
+The renderer creates Pillow scene cards, stitches them with ffmpeg, and writes render proof into `metadata.json`:
+
+```json
+"render": {
+  "mode": "mp4",
+  "status": "success",
+  "renderer": "pillow+ffmpeg",
+  "output": "demo.mp4",
+  "scene_count": 5,
+  "error": null
+}
+```
 
 ## How it works
 
@@ -81,6 +116,7 @@ local repo or GitHub URL
   -> deterministic story package
   -> Kimi critic/script-editor adapter or fallback
   -> Markdown/SVG/SRT/HTML launch artifacts
+  -> optional Pillow + ffmpeg MP4 export
 ```
 
 The MVP deliberately favors one reliable, deterministic golden path over a generic media platform. It is safe to run without model credentials.
@@ -96,7 +132,8 @@ export OPENROUTER_API_KEY="[REDACTED]"
 repo-shorts analyze . \
   --audience "Nous Research Hermes Agent Creative Hackathon judges" \
   --out runs \
-  --kimi-model moonshotai/kimi-k2.6
+  --kimi-model moonshotai/kimi-k2.6 \
+  --render mp4
 ```
 
 If `OPENROUTER_API_KEY`/`KIMI_API_KEY` is absent, the tool writes a deterministic fallback critique and records that honestly in `metadata.json`. If the API call fails, it still writes the package and records `api-error-fallback` rather than pretending the run was live.
@@ -107,6 +144,7 @@ If `OPENROUTER_API_KEY`/`KIMI_API_KEY` is absent, the tool writes a deterministi
 .venv/bin/python -m pytest -q
 .venv/bin/ruff check .
 repo-shorts analyze . --audience "hackathon judges" --out runs --force
+repo-shorts analyze . --audience "hackathon judges" --out runs --render mp4 --force
 ```
 
 ## Hackathon demo angle

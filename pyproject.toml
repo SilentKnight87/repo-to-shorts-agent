@@ -15,7 +15,7 @@ dependencies = [
 
 [project.optional-dependencies]
 dev = ["pytest>=8.0", "ruff>=0.5"]
-render = ["moviepy>=1.0"]
+render = ["pillow>=10.0"]
 
 [project.scripts]
 repo-shorts = "repo_to_shorts.cli:app"

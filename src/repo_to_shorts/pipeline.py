@@ -10,6 +10,7 @@ from jinja2 import Template
 
 from repo_to_shorts.ingest import RepoSnapshot, ingest_target
 from repo_to_shorts.kimi import critique_story
+from repo_to_shorts.render import build_video_scenes, render_video
 
 ARTIFACTS = (
     "metadata.json",
@@ -40,7 +41,10 @@ def run_analysis(
     out_dir: Path | str = Path("runs"),
     force: bool = False,
     kimi_model: str | None = None,
+    render: str = "none",
 ) -> Path:
+    if render not in {"none", "mp4"}:
+        raise ValueError("render must be one of: none, mp4")
     snapshot = ingest_target(target)
     timestamp = datetime.now().strftime("%Y%m%d-%H%M%S")
     run_dir = Path(out_dir) / f"{timestamp}-{_slug(snapshot.name)}"
@@ -68,19 +72,46 @@ def run_analysis(
     for name, content in files.items():
         (run_dir / name).write_text(content, encoding="utf-8")
 
+    artifacts = list(ARTIFACTS)
+    render_metadata = {"mode": "none", "status": "skipped", "renderer": None, "output": None, "scene_count": 0, "error": None}
+    if render == "mp4":
+        scenes = build_video_scenes(snapshot, audience, package, kimi.text)
+        try:
+            result = render_video(run_dir, scenes)
+        except Exception as exc:  # noqa: BLE001 - optional renderer should not break core artifacts.
+            render_metadata = {
+                "mode": "mp4",
+                "status": "failed",
+                "renderer": "pillow+ffmpeg",
+                "output": None,
+                "scene_count": len(scenes),
+                "error": str(exc),
+            }
+        else:
+            artifacts.append(result.output_path.name)
+            render_metadata = {
+                "mode": result.mode,
+                "status": "success" if result.error is None else "failed",
+                "renderer": result.renderer,
+                "output": result.output_path.name,
+                "scene_count": result.scene_count,
+                "error": result.error,
+            }
+
     metadata = {
         "target": target,
         "source_type": snapshot.source_type,
         "repo_name": snapshot.name,
         "audience": audience,
         "created_at": datetime.now().isoformat(timespec="seconds"),
-        "artifacts": list(ARTIFACTS),
+        "artifacts": artifacts,
         "kimi": {
             "mode": kimi.mode,
             "model": kimi.model,
             "provider": kimi.provider,
             "fallback_reason": kimi.fallback_reason,
         },
+        "render": render_metadata,
     }
     (run_dir / "metadata.json").write_text(json.dumps(metadata, indent=2) + "\n", encoding="utf-8")
     return run_dir
