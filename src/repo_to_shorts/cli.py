@@ -6,6 +6,7 @@ import typer
 from rich.console import Console
 
 from repo_to_shorts.pipeline import run_analysis
+from repo_to_shorts.web import run_web_server
 
 DEFAULT_OUT = Path("runs")
 
@@ -45,6 +46,12 @@ def analyze(
     if (run_dir / "demo.mp4").exists():
         console.print(f"[cyan]MP4:[/cyan] {run_dir / 'demo.mp4'}")
     console.print("[cyan]Artifacts:[/cyan] repo brief, storyboard, SVG architecture, narration, captions, launch copy, Kimi critique")
+
+
+@app.command()
+def web(host: str = "127.0.0.1", port: int = 8765) -> None:
+    """Run the local web UI."""
+    run_web_server(host=host, port=port)
 
 
 if __name__ == "__main__":
