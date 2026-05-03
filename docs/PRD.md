@@ -2,7 +2,7 @@
 
 ## One-line product
 
-Repo-to-Shorts Agent turns a GitHub repo or local repo into a finished, submission-ready technical short: repo analysis, narrative, visuals, Kimi critic/editor pass, captions, launch copy, and optionally an MP4 render.
+Repo-to-Shorts Agent turns a GitHub repo or local repo into a submission-ready technical short package: repo analysis, narrative, visuals, Kimi critic/editor pass, captions, launch copy, browser demo, and optional MP4 render.
 
 ## Hackathon goal
 
@@ -19,45 +19,62 @@ Contest framing: Hermes Agent pushed into creative domains including video, imag
 Repo-to-Shorts should be positioned as a Hermes creative workflow, not merely a standalone Python script.
 
 Hermes is the harness:
-- coordinates repo analysis, file operations, terminal commands, browser/demo artifacts, and creative skills
+- coordinates repo analysis, file operations, terminal commands, browser/demo artifacts, rendering, and creative packaging
 - provides the agentic execution layer
 - makes the workflow reusable as a builder tool
 
-Kimi should be used on two fronts:
+Kimi is used on two fronts:
 
-1. **Kimi powers the Hermes harness** where possible. The intended demo posture is: Kimi reasons, Hermes acts. In other words, Hermes Agent runs the creative production workflow with Kimi as the model behind the harness.
+1. **Kimi powers the Hermes harness where possible.** The intended demo posture is: Kimi reasons, Hermes acts.
 2. **Kimi reviews the generated package inside the product.** Repo-to-Shorts calls Kimi as a critic/script editor to sharpen hook, narration, risk notes, and CTA.
 
-This two-front strategy is stronger than a token API call because it makes Kimi both the orchestration brain and the visible editorial collaborator.
+This two-front strategy is stronger than a token model call because Kimi is both the orchestration brain and the visible editorial collaborator.
 
-See `docs/HACKATHON_STRATEGY.md` for the submission narrative and demo framing.
+See `docs/HACKATHON_STRATEGY.md` for submission narrative and demo framing.
 
-## Current truth
+## Current truth, May 3
 
-The current repo is an MVP scaffold that generates a browser-recordable short-video package. It does not yet call the live Kimi model and does not yet render an MP4 automatically.
+The repo is currently a CLI-first MVP with static output serving. It is not yet an interactive website.
 
 Current shipped path:
 
 ```text
-repo target
-  -> deterministic repo snapshot
+repo target, local path or GitHub URL
+  -> repo snapshot
   -> deterministic story package
-  -> deterministic Kimi fallback / placeholder
-  -> Markdown + SVG + SRT + HTML artifacts
-  -> user manually screen-records demo.html
+  -> Kimi critic/script-editor, live via OpenRouter when key is present, honest fallback otherwise
+  -> Markdown + SVG + SRT + HTML launch artifacts
+  -> optional Pillow + ffmpeg vertical MP4
+  -> static file server can show generated runs
 ```
 
-Target path:
+Current non-existent path:
 
 ```text
-repo target
-  -> repo snapshot
-  -> story package
-  -> live Kimi critic/editor rewrite
-  -> visual scenes + captions + narration
-  -> browser demo + rendered MP4
-  -> X/Discord submission package
+browser form
+  -> paste GitHub URL
+  -> click Generate
+  -> wait for job status
+  -> view latest demo.html/demo.mp4 links
 ```
+
+That web UI is the next planned feature. Until it is built, the product is tested through the CLI and viewed through generated artifacts.
+
+## Current capability table
+
+| Area | Status | Evidence |
+| --- | --- | --- |
+| CLI golden path | Built | `repo-shorts analyze <target> --out runs` |
+| Local repo ingest | Built | `src/repo_to_shorts/ingest.py` |
+| Public GitHub URL ingest | Built | shallow clone path in ingest flow |
+| Artifact package | Built | `metadata.json`, markdown, SVG, SRT, HTML outputs |
+| Browser-recordable `demo.html` | Built | generated every run |
+| Live Kimi critic/editor | Built | OpenRouter/Kimi adapter in `src/repo_to_shorts/kimi.py` |
+| Honest Kimi fallback | Built | `deterministic-fallback` and `api-error-fallback` metadata modes |
+| Optional MP4 render | Built | `--render mp4`, Pillow + ffmpeg, `demo.mp4` |
+| Static run viewing | Available ad hoc | local static server over generated `runs/` |
+| Interactive web UI | Not built | planned in `docs/plans/2026-05-03-local-web-ui-plan.md` |
+| Public posting/submission | Not built by design | requires Peter approval |
 
 ## Users
 
@@ -69,6 +86,10 @@ Hackathon judge view:
 - It should show useful creative automation, not just static docs.
 - It should prove the Kimi stage if entering the Kimi track.
 
+Peter/operator view:
+- The local web UI should make the demo feel like a product, not a pile of CLI artifacts.
+- The CLI remains the stable engine. The web UI should be a thin wrapper, not a rewrite.
+
 ## Non-goals for hackathon MVP
 
 - Full video editing suite.
@@ -76,13 +97,15 @@ Hackathon judge view:
 - Social posting automation.
 - Perfect voiceover/TTS.
 - General-purpose repo intelligence platform.
-- Public publishing without user approval.
+- Hosted SaaS deployment.
+- Public publishing without explicit user approval.
+- Complex auth. Local-only is enough.
 
 ## Product requirements
 
-### P0, must ship for credible submission
+### P0, already shipped
 
-0. Hermes harness positioning
+1. Hermes harness positioning
 
 Must document and demonstrate Repo-to-Shorts as a Hermes workflow:
 - Hermes orchestrates the run, file generation, and creative artifact assembly.
@@ -92,7 +115,7 @@ Must document and demonstrate Repo-to-Shorts as a Hermes workflow:
 
 Current status: documented in `docs/HACKATHON_STRATEGY.md`; not yet packaged as a dedicated Hermes skill/workflow.
 
-1. CLI golden path
+2. CLI golden path
 
 Command:
 
@@ -111,7 +134,7 @@ Expected:
 
 Current status: implemented.
 
-2. Repo ingestion
+3. Repo ingestion
 
 Must collect:
 - README text.
@@ -122,7 +145,7 @@ Must collect:
 
 Current status: implemented.
 
-3. Artifact package
+4. Artifact package
 
 Must generate:
 - `metadata.json`
@@ -139,7 +162,7 @@ Must generate:
 
 Current status: implemented.
 
-4. Browser-recordable demo page
+5. Browser-recordable demo page
 
 Must show:
 - Clear hero/hook.
@@ -149,110 +172,118 @@ Must show:
 - Artifact checklist.
 - Recording flow.
 
-Current status: implemented and visually checked.
+Current status: implemented.
 
-5. Real Kimi critic/editor stage
+6. Real Kimi critic/editor stage
 
 Must:
-- Use `KIMI_API_KEY` when available.
-- Call Moonshot/Kimi OpenAI-compatible chat completions.
+- Use `OPENROUTER_API_KEY` or `KIMI_API_KEY` when available.
+- Default to OpenRouter model `moonshotai/kimi-k2.6`.
 - Send repo brief + storyboard + audience.
 - Ask Kimi to return a sharper hook, critique, revised narration, and final CTA.
 - Write actual model output to `kimi_critique.md`.
-- Record `mode: live-api` and model name in `metadata.json`.
+- Record `mode: live-api`, provider, and model name in `metadata.json`.
 - Fall back deterministically if no key or API failure.
 
-Current status: not implemented. Placeholder only.
+Current status: implemented.
 
-6. Honest Kimi proof for demo
+7. Honest Kimi proof for demo
 
-Must show one of:
-- `metadata.json` with `kimi.mode = live-api` and model name.
+Must show:
+- `metadata.json` with `kimi.mode = live-api`, provider, and model name.
 - `kimi_critique.md` containing live model output.
-- Terminal command with `KIMI_API_KEY` set and successful run.
+- Terminal command with API key supplied via environment.
 
-Current status: not implemented because live API is not wired.
+Current status: implemented, but final submission still needs a fresh golden run with live credentials.
+
+8. MP4 render
+
+Must generate:
+- `demo.mp4` when `--render mp4` is requested.
+- render status/proof in `metadata.json`.
+- default artifact-only path must still work without render dependencies.
+
+Current status: implemented with Pillow + ffmpeg.
+
+### P0.5, next planned feature
+
+9. Minimal local web UI
+
+Goal: make the product testable and demoable from a browser without pretending it is a hosted SaaS.
+
+Must provide:
+- local server command, likely `repo-shorts web`
+- page at `/`
+- target input for GitHub URL or local path
+- audience input
+- optional MP4 checkbox
+- Kimi model input defaulting to `moonshotai/kimi-k2.6`
+- Generate button
+- latest runs list
+- links to `demo.html`, `demo.mp4`, `metadata.json`, and `kimi_critique.md`
+- clear status messages for running/success/failure
+
+Must not:
+- publish externally
+- store API keys
+- expose server publicly by default unless explicitly bound to LAN for local demo
+- rewrite the CLI pipeline
+- add a database
+- require a front-end framework
+
+Current status: planned, not implemented. Detailed plan: `docs/plans/2026-05-03-local-web-ui-plan.md`.
 
 ### P1, should ship if time allows
 
-7. MP4 render
+10. Better final-mile submission package
 
-Should generate:
-- `demo.mp4`
+Should include:
+- final golden run checklist
+- exact recording sequence
+- final X copy
+- final Discord copy
+- proof checklist for Kimi Track
 
-Acceptable implementation:
-- Use generated HTML scenes or simple image cards.
-- Render deterministic 60-second MP4 via MoviePy or ffmpeg.
-- Include captions or caption-like text overlays.
-- Use generated `narration.md` as script, not necessarily audio.
+Current status: partially documented in `docs/demo-script.md` and `docs/submission-copy.md`; should be tightened after the web UI decision.
 
-Current status: not implemented. `pyproject.toml` has optional `render = ["moviepy>=1.0"]`, but no rendering code exists.
-
-8. Better story from Kimi
-
-Should allow Kimi to revise:
-- hook
-- story beats
-- narration
-- X post
-- Discord submission copy
-
-Current status: not implemented.
-
-9. Demo command in README
-
-README should clearly separate:
-- current deterministic package generation
-- optional live Kimi mode
-- optional MP4 render mode
-
-Current status: partially documented, but should be updated once features land.
-
-### P2, nice-to-have
-
-10. TTS voiceover
+11. TTS voiceover
 
 Generate audio narration with a local or configured TTS provider.
 
-11. Multiple visual themes
+Current status: not implemented.
+
+12. Multiple visual themes
 
 Allow `--theme dark-terminal`, `--theme clean-launch`, etc.
 
-12. Input diff mode
-
-Allow:
-
-```bash
-repo-shorts analyze . --diff HEAD~1..HEAD
-```
-
-13. Direct social draft export
-
-Generate thread variants, Discord post, and LinkedIn post.
+Current status: not implemented.
 
 ## CLI requirements
 
-Target commands:
+Current commands:
 
 ```bash
 repo-shorts analyze . --audience "hackathon judges" --out runs
 ```
 
 ```bash
-repo-shorts analyze . \
+OPENROUTER_API_KEY="***" repo-shorts analyze . \
   --audience "hackathon judges" \
   --out runs \
-  --kimi-model "kimi-k2-0905-preview"
+  --kimi-model moonshotai/kimi-k2.6 \
+  --render mp4
 ```
 
+Planned web command:
+
 ```bash
-repo-shorts render runs/<run-dir> --format mp4
+repo-shorts web --host 127.0.0.1 --port 8765
 ```
 
-If render is folded into analyze:
+Optional LAN demo mode, only when Peter wants laptop access:
 
 ```bash
-repo-shorts analyze . --render mp4 --out runs
+repo-shorts web --host 0.0.0.0 --port 8765
 ```
 
 ## Output directory contract
@@ -282,28 +313,13 @@ demo.mp4
 Optional future files:
 
 ```text
-scenes/
-frames/
 narration.mp3
+video_plan.json
 ```
 
 ## Metadata contract
 
-Current:
-
-```json
-{
-  "target": ".",
-  "source_type": "local",
-  "repo_name": "repo-to-shorts-agent",
-  "audience": "...",
-  "created_at": "...",
-  "artifacts": [...],
-  "kimi": {"mode": "deterministic-fallback"}
-}
-```
-
-Target:
+Current successful live + MP4 example:
 
 ```json
 {
@@ -315,13 +331,17 @@ Target:
   "artifacts": [...],
   "kimi": {
     "mode": "live-api",
-    "model": "kimi-k2-0905-preview",
+    "model": "moonshotai/kimi-k2.6",
+    "provider": "openrouter",
     "fallback_reason": null
   },
   "render": {
     "mode": "mp4",
-    "file": "demo.mp4",
-    "duration_seconds": 60
+    "status": "success",
+    "renderer": "pillow+ffmpeg",
+    "output": "demo.mp4",
+    "scene_count": 5,
+    "error": null
   }
 }
 ```
@@ -331,29 +351,35 @@ Fallback example:
 ```json
 "kimi": {
   "mode": "deterministic-fallback",
-  "model": null,
-  "fallback_reason": "KIMI_API_KEY not set"
+  "model": "moonshotai/kimi-k2.6",
+  "provider": "openrouter",
+  "fallback_reason": "OPENROUTER_API_KEY/KIMI_API_KEY not set"
 }
 ```
 
 ## Acceptance criteria
 
-### Current MVP acceptance
+### Current CLI MVP acceptance
 
 Passes when:
 
 ```bash
 .venv/bin/python -m pytest -q
 .venv/bin/ruff check .
-.venv/bin/repo-shorts analyze . --audience "Nous Research Hermes Agent Creative Hackathon judges" --out runs
+.venv/bin/repo-shorts analyze . \
+  --audience "Nous Research Hermes Agent Creative Hackathon judges" \
+  --out runs \
+  --render mp4
 ```
 
 Expected:
 - Tests pass.
 - Ruff passes.
 - New run directory exists.
-- All 11 core artifacts exist.
-- `demo.html` opens and is visually screen-recordable.
+- Core artifacts exist.
+- `demo.html` opens.
+- `demo.mp4` exists when render succeeds.
+- `metadata.json` records render status honestly.
 
 Current status: passes.
 
@@ -362,63 +388,59 @@ Current status: passes.
 Passes when:
 
 ```bash
-KIMI_API_KEY=... .venv/bin/repo-shorts analyze . --audience "Nous Research Hermes Agent Creative Hackathon judges" --out runs
+OPENROUTER_API_KEY="***" .venv/bin/repo-shorts analyze . \
+  --audience "Nous Research Hermes Agent Creative Hackathon judges" \
+  --out runs \
+  --kimi-model moonshotai/kimi-k2.6 \
+  --render mp4
 ```
 
 Expected:
-- `kimi_critique.md` contains model-generated critique, not placeholder text.
+- `kimi_critique.md` contains model-generated critique.
 - `metadata.json` has `kimi.mode = live-api`.
-- If API fails, run still succeeds with deterministic fallback and `fallback_reason`.
-- Tests cover both live-call mocked path and fallback path.
+- `metadata.json` has `kimi.provider = openrouter`.
+- `metadata.json` has `kimi.model = moonshotai/kimi-k2.6`.
+- If API fails, run still succeeds with `api-error-fallback` and `fallback_reason`.
+- Tests cover mocked live-call path and fallback path.
 
-Current status: not passing because not implemented.
+Current status: implemented; final submission needs a fresh golden run.
 
-### MP4 acceptance
+### Minimal web UI acceptance
 
 Passes when:
 
 ```bash
-.venv/bin/repo-shorts analyze . --audience "Nous Research Hermes Agent Creative Hackathon judges" --out runs --render mp4
+.venv/bin/repo-shorts web --host 127.0.0.1 --port 8765
 ```
 
 Expected:
-- `demo.mp4` exists.
-- Duration is roughly 45-75 seconds.
-- File opens locally.
-- Visuals show hero, story beats, architecture, Kimi critique, artifact checklist.
-- Tests cover render command without requiring external network.
+- `/` loads a local page.
+- User can enter a GitHub URL or local path and audience.
+- User can request MP4 render.
+- Submit triggers the existing `run_analysis(...)` pipeline.
+- Success page shows links to generated `demo.html`, `demo.mp4` if present, `metadata.json`, and `kimi_critique.md`.
+- Latest runs list appears on the page.
+- Server serves generated artifacts under `/runs/...`.
+- No API keys are shown or stored.
+- Tests cover form rendering, successful generate flow with monkeypatched pipeline, validation/failure path, and artifact links.
 
 Current status: not implemented.
 
 ## What is needed from Peter
 
-### Required
+### Required for final Kimi Track proof
 
-1. Kimi/Moonshot API key
-
-Needed for real Kimi track proof.
+1. Live OpenRouter/Kimi key available in environment during the golden run.
 
 Environment variable:
 
 ```bash
-export KIMI_API_KEY="..."
+export OPENROUTER_API_KEY="***"
 ```
 
-If you do not have one, use the Nous/Kimi hackathon instructions to get access or credits. Without this, we can still submit main track, but Kimi track eligibility is weak.
+No key should be committed, logged into docs, or shown in the video.
 
-2. GitHub auth refresh
-
-Local repo is ahead by one commit. Push failed because `gh` token is invalid.
-
-Run:
-
-```bash
-gh auth login -h github.com
-cd /Users/aiserver/projects/repo-to-shorts-agent
-git push origin main
-```
-
-3. Final submission decision
+2. Final submission decision
 
 Need explicit approval before posting publicly:
 - X post under `@Joash0x`.
@@ -426,51 +448,44 @@ Need explicit approval before posting publicly:
 
 ### Useful but optional
 
-4. Preferred sample input repo
+3. Preferred sample input repo
 
 Default sample is this project itself. Better demo may use:
-- Hermes Agent repo
 - Repo-to-Shorts repo
-- Another small personal agent repo
+- Hermes Agent repo
+- another small personal agent repo
 
-5. Voice preference
+4. Voice preference
 
 Options:
 - Peter records voiceover manually.
 - Use generated captions only.
 - Add TTS later.
 
-6. Visual preference
-
-Options:
-- Dark terminal/agent aesthetic.
-- Clean Linear-style product launch aesthetic.
-- Hacker demo card style.
-
 ## Risks
 
-1. Overclaiming
+1. Moving blind
 
-Do not claim live Kimi or automatic MP4 until implemented. Judges will smell bullshit. They have noses.
+Building features without a current plan makes the project feel random. Fix: keep PRD and implementation plans current before implementation.
 
-2. Kimi API uncertainty
+2. Overclaiming
 
-Model name/base URL may differ from docs/account. Implement adapter with configurable model and graceful fallback.
+Do not claim interactive web UI until implemented. Do not claim live Kimi unless `metadata.json` shows `live-api` from a fresh run.
 
-3. Video rendering yak-shave
+3. Local networking friction
 
-If MP4 rendering gets slow, use the polished `demo.html` screen recording path. A submitted video matters more than elegant renderer internals.
+LAN demo requires binding to `0.0.0.0` and may need macOS firewall permissions. Default should remain `127.0.0.1` for safety.
 
-4. Auth friction
+4. Video rendering yak-shave
 
-GitHub token is currently invalid locally. Fix before relying on remote repo state.
+If MP4 rendering gets slow or brittle, use `demo.html` and generated copy. A submitted video matters more than elegant renderer internals.
 
-## Recommended next implementation order
+## Recommended next order
 
-1. Wire live Kimi adapter with tests.
-2. Update metadata and README to honestly show Kimi modes.
-3. Add optional MP4 render command if time remains.
-4. Run golden path.
-5. Record submission video.
+1. Review and approve `docs/plans/2026-05-03-local-web-ui-plan.md`.
+2. Build minimal local web UI using existing pipeline, not a rewrite.
+3. Run tests/lint.
+4. Generate a fresh live Kimi + MP4 golden run.
+5. Record final demo showing web UI, metadata proof, Kimi critique, and output artifacts.
 6. Tighten X/Discord copy.
-7. Submit after approval.
+7. Submit only after Peter approves.

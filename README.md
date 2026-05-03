@@ -2,9 +2,11 @@
 
 Turn a GitHub repo or local repo into a launch-ready technical short-video package.
 
-Built for the Nous Research Hermes Agent Creative Hackathon as a polished MVP golden path: paste a repo target, get a repo brief, story arc, storyboard, architecture diagram, narration, captions, launch copy, Discord submission copy, Kimi critic notes, and a browser-presentable demo artifact.
+Built for the Nous Research Hermes Agent Creative Hackathon as a polished MVP golden path: pass a repo target, get a repo brief, story arc, storyboard, architecture diagram, narration, captions, launch copy, Discord submission copy, Kimi critic notes, a browser-presentable demo artifact, and optional MP4.
 
 > Repo remains private. The tool does not publish or submit anything externally.
+>
+> Current UX truth: this is CLI-first. The served website currently shows generated artifacts only. A local web form for pasting a GitHub URL is planned in `docs/plans/2026-05-03-local-web-ui-plan.md`, not implemented yet.
 
 ## Kimi + Hermes strategy
 
@@ -34,6 +36,25 @@ Use Python 3.13 from Homebrew on the hackathon machine:
 # Optional MP4 renderer support
 .venv/bin/python -m pip install -e '.[render]'
 ```
+
+## Current interface
+
+Today, Repo-to-Shorts is a CLI-first generator plus generated artifacts:
+
+```bash
+repo-shorts analyze <target> --audience "hackathon judges" --out runs --render mp4
+```
+
+Then open `runs/<latest>/demo.html` or `runs/<latest>/demo.mp4` directly, or serve the `runs/` directory with a local static server.
+
+Not built yet:
+- browser form
+- Generate button
+- job status page
+- run history UI beyond filesystem/static links
+
+Planned next:
+- `docs/plans/2026-05-03-local-web-ui-plan.md`
 
 ## CLI
 
@@ -119,7 +140,7 @@ local repo or GitHub URL
   -> optional Pillow + ffmpeg MP4 export
 ```
 
-The MVP deliberately favors one reliable, deterministic golden path over a generic media platform. It is safe to run without model credentials.
+The MVP deliberately favors one reliable, deterministic golden path over a generic media platform. It is safe to run without model credentials. The next product step is a minimal local web UI that wraps the existing CLI engine instead of replacing it.
 
 ## Kimi critic stage
 
