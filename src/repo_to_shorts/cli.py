@@ -87,6 +87,12 @@ def creative(
     command = ["repo-shorts", "creative", target, "--audience", audience, "--out", str(out)]
     if kimi_model:
         command.extend(["--kimi-model", kimi_model])
+    if music and music.exists():
+        command.extend(["--music", str(music)])
+    if preview:
+        command.append("--preview")
+    if skip_audio:
+        command.append("--skip-audio")
     if final:
         command.append("--final")
     command.extend(["--tts-provider", tts_provider])

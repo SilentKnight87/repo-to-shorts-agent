@@ -35,3 +35,67 @@ def test_creative_help_shows_final_tts_options():
     assert "--fallback-tts-provider" in result.output
     assert "--voice" in result.output
     assert "--no-generated-music" in result.output
+
+
+def test_creative_passes_full_submission_command(monkeypatch, tmp_path):
+    captured = {}
+
+    def fake_run_creative_pipeline(*args, **kwargs):
+        captured["args"] = args
+        captured["kwargs"] = kwargs
+        return {"output": str(tmp_path / "demo.mp4"), "run_dir": str(tmp_path)}
+
+    music = tmp_path / "music.mp3"
+    music.write_bytes(b"music")
+    monkeypatch.setattr("repo_to_shorts.hermes_skill.run_creative_pipeline", fake_run_creative_pipeline)
+
+    result = runner.invoke(
+        app,
+        [
+            "creative",
+            ".",
+            "--audience",
+            "judges",
+            "--out",
+            str(tmp_path),
+            "--kimi-model",
+            "moonshotai/kimi-k2.6",
+            "--music",
+            str(music),
+            "--preview",
+            "--skip-audio",
+            "--final",
+            "--tts-provider",
+            "xai",
+            "--fallback-tts-provider",
+            "openai",
+            "--voice",
+            "orpheus",
+            "--no-generated-music",
+        ],
+    )
+
+    assert result.exit_code == 0
+    assert captured["kwargs"]["command"] == [
+        "repo-shorts",
+        "creative",
+        ".",
+        "--audience",
+        "judges",
+        "--out",
+        str(tmp_path),
+        "--kimi-model",
+        "moonshotai/kimi-k2.6",
+        "--music",
+        str(music),
+        "--preview",
+        "--skip-audio",
+        "--final",
+        "--tts-provider",
+        "xai",
+        "--fallback-tts-provider",
+        "openai",
+        "--voice",
+        "orpheus",
+        "--no-generated-music",
+    ]

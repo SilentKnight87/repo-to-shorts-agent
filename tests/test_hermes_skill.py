@@ -192,6 +192,97 @@ def test_run_creative_pipeline_final_writes_validation_submission_and_srt(
     assert metadata["tts"]["provider"] == "xai"
     assert "captions.srt" in metadata["artifacts"]
     assert "submission_pack.md" in metadata["artifacts"]
+    assert mock_submission.call_args.kwargs["metadata"] == metadata
+    assert mock_submission.call_args.kwargs["validation"] is mock_validate.return_value
+
+
+@patch("repo_to_shorts.hermes_skill.write_submission_pack")
+@patch("repo_to_shorts.hermes_skill.validate_media")
+@patch("repo_to_shorts.hermes_skill.ingest_target")
+@patch("repo_to_shorts.hermes_skill.direct")
+@patch("repo_to_shorts.hermes_skill.generate_manim_script")
+@patch("repo_to_shorts.hermes_skill.render_scene")
+@patch("repo_to_shorts.hermes_skill._merge_creative_video")
+def test_run_creative_pipeline_records_tts_only_when_generated_music_disabled(
+    mock_merge,
+    mock_render,
+    mock_script,
+    mock_direct,
+    mock_ingest,
+    mock_validate,
+    mock_submission,
+    tmp_path: Path,
+):
+    mock_ingest.return_value = FakeSnapshot()
+    mock_direct.return_value = MagicMock(
+        style="dark-terminal",
+        title="No Music",
+        hook="No generated music",
+        scenes=[{"duration_seconds": 10, "narration": "Scene."} for _ in range(5)],
+        music_mood="electronic",
+        total_duration=50,
+    )
+    mock_script.return_value = tmp_path / "script.json"
+    raw = tmp_path / "video.mp4"
+    raw.write_bytes(b"raw")
+    mock_render.return_value = raw
+    mock_validate.return_value = {"ok": True, "errors": []}
+
+    result = run_creative_pipeline(".", out_dir=tmp_path, generated_music=False)
+
+    run_dir = Path(result["run_dir"])
+    metadata = json.loads((run_dir / "metadata.json").read_text(encoding="utf-8"))
+
+    assert metadata["render"]["audio"] == "tts-only"
+    assert mock_merge.call_args.kwargs["generated_music"] is False
+    assert mock_submission.call_args.kwargs["metadata"] == metadata
+
+
+@patch("repo_to_shorts.hermes_skill.write_submission_pack")
+@patch("repo_to_shorts.hermes_skill.validate_media")
+@patch("repo_to_shorts.hermes_skill.ingest_target")
+@patch("repo_to_shorts.hermes_skill.direct")
+@patch("repo_to_shorts.hermes_skill.generate_manim_script")
+@patch("repo_to_shorts.hermes_skill.render_scene")
+@patch("repo_to_shorts.hermes_skill._copy_video")
+@patch("repo_to_shorts.hermes_skill._merge_creative_video")
+def test_run_creative_pipeline_final_tts_none_copies_video_and_validates_without_audio(
+    mock_merge,
+    mock_copy,
+    mock_render,
+    mock_script,
+    mock_direct,
+    mock_ingest,
+    mock_validate,
+    mock_submission,
+    tmp_path: Path,
+):
+    mock_ingest.return_value = FakeSnapshot()
+    mock_direct.return_value = MagicMock(
+        style="dark-terminal",
+        title="Silent",
+        hook="Silent final",
+        scenes=[{"duration_seconds": 10, "narration": "Scene."} for _ in range(5)],
+        music_mood="electronic",
+        total_duration=50,
+    )
+    mock_script.return_value = tmp_path / "script.json"
+    raw = tmp_path / "video.mp4"
+    raw.write_bytes(b"raw")
+    mock_render.return_value = raw
+    mock_validate.return_value = {"ok": True, "errors": []}
+
+    result = run_creative_pipeline(".", out_dir=tmp_path, final=True, tts_provider="none")
+
+    run_dir = Path(result["run_dir"])
+    metadata = json.loads((run_dir / "metadata.json").read_text(encoding="utf-8"))
+
+    mock_merge.assert_not_called()
+    mock_copy.assert_called_once()
+    mock_validate.assert_called_once_with(Path(result["output"]), require_audio=False)
+    assert metadata["tts"]["skipped"] is True
+    assert metadata["render"]["audio"] == "skipped"
+    assert mock_submission.call_args.kwargs["metadata"] == metadata
 
 
 @patch("repo_to_shorts.hermes_skill.validate_media")

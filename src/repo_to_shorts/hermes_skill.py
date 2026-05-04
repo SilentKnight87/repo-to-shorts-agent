@@ -163,7 +163,11 @@ def run_creative_pipeline(
                 "output": "demo.mp4",
                 "scene_count": len(brief.scenes),
                 "preview": preview,
-                "audio": "skipped" if skip_audio else "tts+generated-music",
+                "audio": _render_audio_label(
+                    skip_audio=skip_audio,
+                    music_path=music_path,
+                    generated_music=generated_music,
+                ),
                 "final": final,
                 "validation": validation,
             },
@@ -233,6 +237,16 @@ def _srt_timestamp(seconds: float) -> str:
     minutes, remainder = divmod(remainder, 60_000)
     secs, millis = divmod(remainder, 1000)
     return f"{hours:02d}:{minutes:02d}:{secs:02d},{millis:03d}"
+
+
+def _render_audio_label(*, skip_audio: bool, music_path: Path | None, generated_music: bool) -> str:
+    if skip_audio:
+        return "skipped"
+    if music_path is not None:
+        return "tts+supplied-music"
+    if generated_music:
+        return "tts+generated-music"
+    return "tts-only"
 
 
 def _build_repo_analysis(snapshot) -> dict:
