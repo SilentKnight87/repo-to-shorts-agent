@@ -55,6 +55,41 @@ This command should create a timestamped run directory containing:
 - `submission_pack.md`
 - existing useful creative artifacts where already available
 
+## Hermes Orchestration
+
+Hermes Agent is incorporated as the agentic operator around the deterministic CLI engine, not as a hidden runtime dependency inside the renderer.
+
+There are two orchestration layers:
+
+1. **Product orchestration inside the repo.** `run_creative_pipeline()` coordinates ingestion, Kimi creative direction, rendering, narration, audio mixing, captioning, validation, metadata, and packaging. This layer must be deterministic enough to test without live services.
+2. **Hermes orchestration outside the repo.** Hermes Agent invokes the CLI, watches progress, inspects generated artifacts, checks Kimi/media proof, decides whether the run is shippable, and prepares the X/Discord submission package.
+
+This split is intentional. It keeps the CLI usable by anyone, while making the hackathon demo clearly about Hermes acting as a creative production agent.
+
+The final demo workflow should look like:
+
+```text
+Operator prompt / Hermes task
+  -> Hermes selects the final Repo-to-Shorts workflow
+  -> Hermes runs `repo-shorts creative ... --final`
+  -> CLI produces the run directory
+  -> Hermes opens metadata.json and validates Kimi proof
+  -> Hermes opens/plays demo.mp4 and validates media status
+  -> Hermes reads submission_pack.md
+  -> Hermes reports the exact files and copy the operator should post
+```
+
+The generated `submission_pack.md` should include a short "Hermes orchestration proof" section:
+
+- command Hermes ran, with secrets omitted
+- run directory
+- Kimi proof fields from `metadata.json`
+- media validation summary
+- final post/submission copy
+- note that Hermes orchestrated the workflow and Repo-to-Shorts produced the artifacts
+
+The MVP does not need a Hermes SDK integration or hosted service. A Hermes-run CLI workflow plus generated proof artifacts is enough for this hackathon slice.
+
 ## Non-Goals
 
 - Build or polish the website.
@@ -127,6 +162,8 @@ Responsibilities:
 ### `hermes_skill.py`
 
 Remains the orchestration layer for creative runs.
+
+The filename is historical and useful, but the module is the product's internal pipeline coordinator. It should not be presented as the whole Hermes Agent integration by itself.
 
 New or tightened responsibilities:
 
@@ -218,6 +255,7 @@ Output:
 Contents:
 
 - exact command used, with secrets omitted
+- Hermes orchestration proof summary
 - Kimi proof checklist
 - MP4 validation summary
 - X post draft
@@ -245,7 +283,8 @@ In final mode, validation failures should make the CLI exit non-zero with a usef
 ## Data Flow
 
 ```text
-CLI flags
+Hermes task or human terminal command
+  -> CLI flags
   -> run_creative_pipeline(options)
   -> ingest_target(target)
   -> _build_repo_analysis(snapshot)
@@ -309,6 +348,7 @@ Integration tests:
 
 - deterministic preview run still works without keys.
 - final run can be exercised with mocked Kimi/TTS/ffprobe and no network.
+- submission pack explains Hermes orchestration without claiming Hermes is embedded in the renderer.
 
 Manual smoke after implementation:
 
@@ -342,6 +382,7 @@ OPENAI_API_KEY="$OPENAI_API_KEY" \
 - `repo-shorts creative . --final` creates a timestamped run directory.
 - Final mode writes `demo.mp4`, `metadata.json`, `captions.srt`, and `submission_pack.md`.
 - `metadata.json` records Kimi mode, model, provider, TTS provider, render settings, and media validation.
+- `submission_pack.md` includes a Hermes orchestration proof section.
 - If Kimi succeeds live, metadata shows `mode=live-api`, `provider=openrouter`, and `model=moonshotai/kimi-k2.6`.
 - If Kimi falls back, metadata says so plainly.
 - Final mode does not include `.env` or secret-like paths in rendered evidence.
@@ -355,7 +396,7 @@ OPENAI_API_KEY="$OPENAI_API_KEY" \
 3. Add TTS provider abstraction for xAI/OpenAI/Edge/none.
 4. Tighten Kimi final-mode prompt and fallback metadata.
 5. Add media validation.
-6. Add `submission_pack.md`.
+6. Add `submission_pack.md` with Hermes orchestration proof.
 7. Apply focused render polish and file evidence filtering.
 8. Run deterministic and live smoke tests.
 
