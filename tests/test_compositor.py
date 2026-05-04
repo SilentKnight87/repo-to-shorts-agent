@@ -227,6 +227,55 @@ def test_generate_tts_falls_back_from_xai_to_openai(monkeypatch, tmp_path: Path)
     assert providers == ["openai"]
 
 
+def test_generate_tts_uses_elevenlabs_provider(monkeypatch, tmp_path: Path):
+    requests = []
+    commands = []
+
+    class FakeResponse:
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *args):
+            return None
+
+        def read(self):
+            return b"fake mp3"
+
+    def fake_urlopen(request, timeout=60):
+        requests.append(request)
+        return FakeResponse()
+
+    def fake_run(command, **kwargs):
+        commands.append(command)
+        out = Path(command[-1])
+        out.write_bytes(b"fake wav")
+        return subprocess.CompletedProcess(command, 0, "", "")
+
+    monkeypatch.setenv("ELEVENLABS_API_KEY", "test-elevenlabs")
+    monkeypatch.setattr("repo_to_shorts.compositor.urllib.request.urlopen", fake_urlopen)
+    monkeypatch.setattr("repo_to_shorts.compositor.subprocess.run", fake_run)
+
+    result = generate_tts(
+        "Ship the VHS cut.",
+        tmp_path / "tts.wav",
+        provider="elevenlabs",
+        voice="voice-123",
+    )
+
+    assert result == (tmp_path / "tts.wav").resolve()
+    assert requests
+    assert requests[0].full_url == (
+        "https://api.elevenlabs.io/v1/text-to-speech/voice-123"
+        "?output_format=mp3_44100_128"
+    )
+    assert requests[0].headers["Xi-api-key"] == "test-elevenlabs"
+    payload = json.loads(requests[0].data)
+    assert payload["text"] == "Ship the VHS cut."
+    assert payload["model_id"] == "eleven_turbo_v2_5"
+    assert payload["voice_settings"]["use_speaker_boost"] is True
+    assert commands[0][0] == "ffmpeg"
+
+
 def test_generate_tts_none_provider_raises_clear_error(tmp_path: Path):
     try:
         generate_tts("No voice.", tmp_path / "tts.wav", provider="none")

@@ -195,6 +195,8 @@ def _generate_tts_source(
         return _generate_xai_tts(text, output_path, voice)
     if provider == "openai":
         return _generate_openai_tts(text, output_path, voice)
+    if provider == "elevenlabs":
+        return _generate_elevenlabs_tts(text, output_path, voice)
     if provider == "edge":
         return _generate_edge_tts(text, output_path, voice, allow_say_fallback)
     if provider == "none":
@@ -223,6 +225,40 @@ def _generate_openai_tts(text: str, output_path: Path, voice: str | None) -> Pat
     url = "https://api.openai.com/v1/audio/speech"
     payload = {"model": "gpt-4o-mini-tts", "input": text, "voice": voice or "alloy", "response_format": "mp3"}
     headers = {"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"}
+    return _request_tts_mp3(url, payload, headers, output_path)
+
+
+# Default to Adam — deep trailer-narrator voice, fits retro-VHS-cinematic theme.
+ELEVENLABS_DEFAULT_VOICE = "pNInz6obpgDQGcFmaJgB"
+ELEVENLABS_MODEL = "eleven_turbo_v2_5"
+
+
+def _generate_elevenlabs_tts(text: str, output_path: Path, voice: str | None) -> Path:
+    try:
+        api_key = os.environ["ELEVENLABS_API_KEY"]
+    except KeyError as exc:
+        raise RuntimeError("ELEVENLABS_API_KEY is required for elevenlabs TTS provider") from exc
+
+    voice_id = voice or ELEVENLABS_DEFAULT_VOICE
+    url = (
+        f"https://api.elevenlabs.io/v1/text-to-speech/{voice_id}"
+        "?output_format=mp3_44100_128"
+    )
+    payload = {
+        "text": text,
+        "model_id": ELEVENLABS_MODEL,
+        "voice_settings": {
+            "stability": 0.4,
+            "similarity_boost": 0.85,
+            "style": 0.55,
+            "use_speaker_boost": True,
+        },
+    }
+    headers = {
+        "xi-api-key": api_key,
+        "Content-Type": "application/json",
+        "Accept": "audio/mpeg",
+    }
     return _request_tts_mp3(url, payload, headers, output_path)
 
 

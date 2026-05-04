@@ -64,7 +64,7 @@ def creative(
     preview: bool = typer.Option(False, "--preview", help="Fast 12-15s preview render for iteration."),
     skip_audio: bool = typer.Option(False, "--skip-audio", help="Skip TTS/music composition for fastest visual iteration."),
     final: bool = typer.Option(False, "--final", help="Run submission-grade final export with validation."),
-    tts_provider: str = typer.Option("edge", "--tts-provider", help="TTS provider: xai, openai, edge, or none."),
+    tts_provider: str = typer.Option("edge", "--tts-provider", help="TTS provider: xai, openai, elevenlabs, edge, or none."),
     fallback_tts_provider: str | None = typer.Option(
         None,
         "--fallback-tts-provider",
