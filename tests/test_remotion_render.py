@@ -335,6 +335,7 @@ def test_render_remotion_video_returns_failure_for_subprocess_error(
     assert result.scene_count == 1
     assert result.error is not None
     assert result.error.startswith("Remotion render failed:")
+    assert "boom" in result.error
 
 
 def test_render_remotion_video_returns_failure_when_output_is_missing(

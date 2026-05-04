@@ -135,7 +135,7 @@ def render_remotion_video(
             mode="mp4",
             renderer="remotion",
             scene_count=scene_count,
-            error=f"Remotion render failed: {exc}",
+            error=f"Remotion render failed: {_format_subprocess_error(exc)}",
         )
 
     if not output_path.exists():
@@ -184,6 +184,24 @@ def _string_list(value: Any, *, limit: int) -> list[str]:
     if isinstance(value, list | tuple):
         return [str(item) for item in value][:limit]
     return [str(value)][:limit]
+
+
+def _format_subprocess_error(exc: OSError | subprocess.CalledProcessError) -> str:
+    if isinstance(exc, subprocess.CalledProcessError):
+        captured = _trim_process_output(exc.stderr or exc.stdout)
+        if captured:
+            return f"{type(exc).__name__}: {captured}"
+    return str(exc)
+
+
+def _trim_process_output(output: Any, *, limit: int = 800) -> str:
+    if output is None:
+        return ""
+    text = output.decode("utf-8", errors="replace") if isinstance(output, bytes) else str(output)
+    text = text.strip()
+    if len(text) <= limit:
+        return text
+    return f"{text[:limit].rstrip()}..."
 
 
 def _default_scene_type(index: int) -> str:
