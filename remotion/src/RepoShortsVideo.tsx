@@ -231,7 +231,8 @@ const SceneFrame: React.FC<{
   sceneCount: number;
   durationInFrames: number;
 }> = ({manifest, scene, sceneIndex, sceneCount, durationInFrames}) => {
-  const typeName = KNOWN_SCENE_TYPES.has(scene.type) ? scene.type : 'RepoEvidence';
+  const isKnownSceneType = KNOWN_SCENE_TYPES.has(scene.type);
+  const typeName = scene.type;
   const frame = useCurrentFrame();
   const entrance = spring({frame, fps: 30, config: {damping: 18, stiffness: 130}});
   const exit = interpolate(
@@ -260,7 +261,7 @@ const SceneFrame: React.FC<{
         {typeName === 'LiveProof' && <LiveProof manifest={manifest} scene={scene} />}
         {typeName === 'DemoPreview' && <DemoPreview manifest={manifest} scene={scene} />}
         {typeName === 'CTAEndCard' && <CTAEndCard manifest={manifest} scene={scene} />}
-        {!KNOWN_SCENE_TYPES.has(scene.type) && <UnknownScene manifest={manifest} scene={scene} />}
+        {!isKnownSceneType && <UnknownScene manifest={manifest} scene={scene} />}
         <CaptionLine scene={scene} />
       </div>
     </AbsoluteFill>
