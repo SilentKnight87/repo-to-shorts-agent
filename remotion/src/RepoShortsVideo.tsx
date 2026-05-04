@@ -228,6 +228,9 @@ export const RepoShortsVideo: React.FC<RepoShortsManifest> = (props) => {
         return sequence;
       })}
       <FilmGrain />
+      <CRTScanlines />
+      <CRTVignette />
+      <BroadcastFrame manifest={manifest} />
     </AbsoluteFill>
   );
 };
@@ -1140,6 +1143,168 @@ const FilmGrain: React.FC = () => (
     }}
   />
 );
+
+const CRTScanlines: React.FC = () => (
+  <AbsoluteFill
+    style={{
+      pointerEvents: 'none',
+      backgroundImage:
+        'repeating-linear-gradient(0deg, rgba(0, 0, 0, 0) 0px, rgba(0, 0, 0, 0) 2px, rgba(0, 0, 0, 0.18) 2px, rgba(0, 0, 0, 0.18) 3px)',
+      mixBlendMode: 'multiply',
+      opacity: 0.55,
+    }}
+  />
+);
+
+const CRTVignette: React.FC = () => (
+  <AbsoluteFill
+    style={{
+      pointerEvents: 'none',
+      background:
+        'radial-gradient(ellipse at center, rgba(0,0,0,0) 50%, rgba(0,0,0,0.45) 100%)',
+      mixBlendMode: 'multiply',
+    }}
+  />
+);
+
+const formatTimecode = (frame: number, fps: number): string => {
+  const totalFrames = Math.max(0, Math.floor(frame));
+  const ff = totalFrames % fps;
+  const totalSec = Math.floor(totalFrames / fps);
+  const ss = totalSec % 60;
+  const mm = Math.floor(totalSec / 60) % 60;
+  const hh = Math.floor(totalSec / 3600);
+  const pad = (n: number, w = 2) => String(n).padStart(w, '0');
+  return `${pad(hh)}:${pad(mm)}:${pad(ss)}:${pad(ff)}`;
+};
+
+const BAR_COLORS = ['#bcb6a8', '#c8b832', '#3ab2b9', '#4cb24a', '#bf3aa8', '#c8392a', '#3a48b9'];
+
+const BroadcastFrame: React.FC<{manifest: NormalizedManifest}> = ({manifest}) => {
+  const frame = useCurrentFrame();
+  const recPulse = interpolate(Math.sin(frame / 8), [-1, 1], [0.45, 1]);
+  const tc = formatTimecode(frame, 30);
+
+  // Determine which scene we're in for the slate channel label
+  let runningFrames = 0;
+  let activeType = 'COLD-OPEN';
+  for (const scene of manifest.scenes) {
+    const dur = Math.max(1, Math.round(scene.duration_seconds * 30));
+    if (frame >= runningFrames && frame < runningFrames + dur) {
+      activeType = String(scene.type)
+        .replace(/([a-z])([A-Z])/g, '$1-$2')
+        .toUpperCase();
+      break;
+    }
+    runningFrames += dur;
+  }
+
+  return (
+    <AbsoluteFill style={{pointerEvents: 'none'}}>
+      {/* Top tape edge */}
+      <div
+        style={{
+          position: 'absolute',
+          top: 0,
+          left: 0,
+          right: 0,
+          height: 4,
+          background: `repeating-linear-gradient(90deg, ${colors.paperDim} 0 6px, transparent 6px 14px)`,
+          opacity: 0.45,
+        }}
+      />
+
+      {/* Slate header */}
+      <div
+        style={{
+          position: 'absolute',
+          top: 6,
+          left: 0,
+          right: 0,
+          height: 56,
+          background: `linear-gradient(to bottom, ${colors.carbon} 0%, ${colors.carbon}f5 100%)`,
+          borderBottom: `1px dashed ${colors.line}`,
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          padding: '0 28px',
+          fontFamily: type.mono,
+          fontSize: 18,
+          letterSpacing: '0.18em',
+          color: colors.labelCream,
+          textTransform: 'uppercase',
+        }}
+      >
+        <span style={{color: colors.rec, opacity: recPulse, fontWeight: 700}}>● REC</span>
+        <span>CH 02 — {activeType}</span>
+        <span style={{color: colors.paperDim}}>{tc}</span>
+      </div>
+
+      {/* SMPTE color bars under slate */}
+      <div
+        style={{
+          position: 'absolute',
+          top: 62,
+          left: 0,
+          right: 0,
+          height: 14,
+          display: 'flex',
+        }}
+      >
+        {BAR_COLORS.map((c, i) => (
+          <div key={i} style={{flex: 1, background: c, opacity: 0.78}} />
+        ))}
+      </div>
+
+      {/* Scope strip footer */}
+      <div
+        style={{
+          position: 'absolute',
+          bottom: 0,
+          left: 0,
+          right: 0,
+          height: 28,
+          borderTop: `1px dashed ${colors.line}`,
+          background: `${colors.carbon}f8`,
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          gap: 18,
+          fontFamily: type.mono,
+          fontSize: 11,
+          letterSpacing: '0.18em',
+          color: colors.paperDim,
+          textTransform: 'uppercase',
+        }}
+      >
+        <span>TBC</span>
+        <span style={{color: colors.line}}>·</span>
+        <span>SC-H</span>
+        <span style={{color: colors.line}}>·</span>
+        <span>DROPOUT 0.0%</span>
+        <span style={{color: colors.line}}>·</span>
+        <span style={{color: colors.lock}}>AGC ON</span>
+        <span style={{color: colors.line}}>·</span>
+        <span>1080×1920</span>
+        <span style={{color: colors.line}}>·</span>
+        <span>30FPS</span>
+      </div>
+
+      {/* Bottom tape edge */}
+      <div
+        style={{
+          position: 'absolute',
+          bottom: 30,
+          left: 0,
+          right: 0,
+          height: 4,
+          background: `repeating-linear-gradient(90deg, ${colors.paperDim} 0 6px, transparent 6px 14px)`,
+          opacity: 0.45,
+        }}
+      />
+    </AbsoluteFill>
+  );
+};
 
 const splitHeadline = (text: string, maxWordsPerLine: number): string[] => {
   const words = text.split(/\s+/).filter(Boolean);

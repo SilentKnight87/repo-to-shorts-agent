@@ -1,19 +1,27 @@
 import type {CSSProperties} from 'react';
 
 export const colors = {
-  carbon: '#080a0f',
-  ink: '#10131b',
-  panel: 'rgba(13, 17, 26, 0.86)',
-  panelSoft: 'rgba(23, 29, 43, 0.72)',
-  paper: '#f6f1df',
-  paperDim: '#d5cda9',
-  cyan: '#45f7ff',
-  green: '#a8ff60',
-  amber: '#ffcf5a',
-  red: '#ff4e64',
+  carbon: '#0b0707',
+  ink: '#120c0c',
+  panel: 'rgba(18, 12, 12, 0.86)',
+  panelSoft: 'rgba(26, 16, 16, 0.72)',
+  paper: '#f0e8d8',
+  paperDim: '#c9b89a',
+  // Mapped to website tokens:
+  cyan: '#38d8ff',     // ghost cyan
+  green: '#4afa8c',    // --lock
+  amber: '#ffcf5a',    // chip / yellow accent
+  red: '#ff5e5e',      // --rec
+  live: '#ff8c4a',     // --live
+  lock: '#4afa8c',
+  rec: '#ff5e5e',
+  ghostMagenta: '#ff3a8e',
+  ghostCyan: '#38d8ff',
+  labelCream: '#e8d8b6',
+  labelInk: '#3a2a14',
   violet: '#b188ff',
-  line: 'rgba(246, 241, 223, 0.18)',
-  ghost: 'rgba(246, 241, 223, 0.08)',
+  line: 'rgba(240, 232, 216, 0.18)',
+  ghost: 'rgba(240, 232, 216, 0.08)',
 };
 
 export const type = {
