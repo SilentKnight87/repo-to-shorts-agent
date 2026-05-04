@@ -99,3 +99,20 @@ def test_creative_passes_full_submission_command(monkeypatch, tmp_path):
         "orpheus",
         "--no-generated-music",
     ]
+
+
+def test_creative_submission_command_preserves_missing_music_path(monkeypatch):
+    captured = {}
+
+    def fake_run_creative_pipeline(*args, **kwargs):
+        captured["args"] = args
+        captured["kwargs"] = kwargs
+        return {"output": "demo.mp4", "run_dir": "runs/test"}
+
+    monkeypatch.setattr("repo_to_shorts.hermes_skill.run_creative_pipeline", fake_run_creative_pipeline)
+
+    result = runner.invoke(app, ["creative", ".", "--music", "missing.mp3"])
+
+    assert result.exit_code == 0
+    assert "--music" in captured["kwargs"]["command"]
+    assert "missing.mp3" in captured["kwargs"]["command"]

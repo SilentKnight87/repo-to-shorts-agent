@@ -52,6 +52,9 @@ def run_creative_pipeline(
 
     Returns {"output": str(final_mp4), "run_dir": str(run_dir)}
     """
+    if music_path is not None and not music_path.exists():
+        raise ValueError(f"Music file not found: {music_path}")
+
     if session_id:
         ProgressTracker.create_session(session_id)
     if final:

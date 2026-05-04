@@ -76,6 +76,17 @@ def test_build_repo_analysis_keeps_common_repo_layout_evidence():
     assert "runs/demo.mp4" not in analysis["key_files"]
 
 
+def test_run_creative_pipeline_rejects_missing_music_path(tmp_path: Path):
+    missing_music = tmp_path / "missing.mp3"
+
+    try:
+        run_creative_pipeline(".", out_dir=tmp_path, music_path=missing_music)
+    except ValueError as exc:
+        assert f"Music file not found: {missing_music}" in str(exc)
+    else:
+        raise AssertionError("missing supplied music path should fail before ingest")
+
+
 @patch("repo_to_shorts.hermes_skill.ingest_target")
 @patch("repo_to_shorts.hermes_skill.direct")
 @patch("repo_to_shorts.hermes_skill.generate_manim_script")
