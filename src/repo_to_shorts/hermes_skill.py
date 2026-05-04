@@ -436,7 +436,9 @@ def _merge_creative_video(
         mixed_audio = tmpdir / "mixed.aac"
         mix_audio(full_tts, music_path, mixed_audio, duration_seconds=total_duration)
 
-        # Merge video + audio first
+        # Merge video + audio. Explicit -map prevents ffmpeg from picking the
+        # source video's existing audio track (Remotion outputs a silent audio
+        # stream that would otherwise clobber the mixed narration+music).
         video_with_audio = tmpdir / "video_audio.mp4"
         subprocess.run(
             [
@@ -446,6 +448,10 @@ def _merge_creative_video(
                 str(video_path.resolve()),
                 "-i",
                 str(mixed_audio.resolve()),
+                "-map",
+                "0:v:0",
+                "-map",
+                "1:a:0",
                 "-c:v",
                 "copy",
                 "-c:a",
