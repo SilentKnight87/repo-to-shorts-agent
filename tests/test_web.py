@@ -52,47 +52,54 @@ class TestHomePage:
         assert 'name="target"' in html
         assert 'name="audience"' in html
         assert 'name="kimi_model"' in html
-        assert 'name="render_mp4"' in html
+        assert 'data-flag="render_mp4"' in html
         assert 'name="preview"' in html
         assert 'name="skip_audio"' in html
 
-    def test_home_page_includes_submit_loading_indicator(self):
+    def test_home_page_uses_new_vhs_components(self):
         html = render_home_page([])
-
+        # Identity & framing
+        assert 'class="slate"' in html
+        assert "colorbars" in html
+        assert "tape-edge" in html
+        # Hero
+        assert "glitch-headline" in html
+        assert "kicker" in html
+        # Form deck
         assert 'id="generate-form"' in html
-        assert 'role="status"' in html
-        assert 'aria-live="polite"' in html
-        assert 'aria-atomic="true"' in html
-        assert "Generating your short package" in html
-        assert "loading-panel" in html
-        assert "spinner" in html
-        assert "is-submitting" in html
-        assert "aria-busy" in html
-        assert "Generating…" in html
-
-    def test_home_page_submit_script_posts_existing_form_after_loading_repaint(self):
-        html = render_home_page([])
-
         assert 'method="POST"' in html
         assert 'action="/generate"' in html
-        assert 'addEventListener("submit"' in html
-        assert "event.preventDefault()" in html
-        assert "window.setTimeout" in html
-        assert "HTMLFormElement.prototype.submit.call(form)" in html
+        assert "tape-input" in html
+        assert "btn-tape" in html
+        assert "toggle-mode" in html
+        # Generating-state takeover (hidden by default, populated by JS)
+        assert "deck-broadcasting" in html
+        assert "channel-row" in html
+        assert 'data-stage="ingest"' in html
+        assert 'data-stage="render_frames"' in html
+        assert "vu-meter" in html
+        # Bottom
+        assert "scope-strip" in html
 
-    def test_loading_panel_is_hidden_until_submit_state(self):
+    def test_home_page_loads_static_assets_not_inline(self):
         html = render_home_page([])
+        # New external assets
+        assert 'href="/static/style.css"' in html
+        assert 'src="/static/app.js"' in html
+        # Old inline blobs are gone
+        assert "addEventListener" not in html
+        assert "HTMLFormElement.prototype.submit" not in html
+        assert ".loading-panel { display: none" not in html
 
-        assert ".loading-panel { display: none" in html
-        assert ".form-card.is-submitting .loading-panel { display: block" in html
-
-    def test_home_page_includes_premium_demo_surface(self):
-        html = render_home_page([])
-
-        assert "Demo cockpit" in html
-        assert "artifact-gallery" in html
-        assert "Repo signal, edited like a launch film" in html
-        assert "Proof layer" in html
+    def test_home_page_tape_archive_renders_runs(self, tmp_path: Path):
+        run1 = tmp_path / "20260503-092819-repo-to-shorts-agent"
+        run1.mkdir()
+        (run1 / "demo.html").write_text("demo")
+        runs = list_runs(tmp_path, limit=10)
+        html = render_home_page(runs)
+        assert "TAPE ARCHIVE" in html
+        assert "tape-label" in html
+        assert "20260503-092819-repo-to-shorts-agent" in html
 
     def test_home_page_shows_latest_runs(self, tmp_path: Path):
         run1 = tmp_path / "20260503-092819-repo-to-shorts-agent"
@@ -211,8 +218,8 @@ class TestGenerate:
             with urllib.request.urlopen(req) as resp:
                 assert resp.status == 200
                 body = resp.read().decode()
-                assert "Generation complete" in body
-                assert "Creative brief" in body
+                assert "BROADCAST COMPLETE" in body
+                assert "BROADCAST CUE SHEET" in body
         finally:
             _stop_server(server)
 
@@ -291,6 +298,73 @@ class TestPathTraversal:
             assert exc_info.value.code == 404
         finally:
             _stop_server(server)
+
+
+class TestStaticFiles:
+    def test_static_serves_css(self, tmp_path: Path):
+        server, port = _start_server(tmp_path)
+        try:
+            with urllib.request.urlopen(f"http://127.0.0.1:{port}/static/style.css") as resp:
+                assert resp.status == 200
+                assert resp.headers["Content-Type"].startswith("text/css")
+                body = resp.read().decode()
+                assert ":root" in body
+                assert "--bg" in body
+        finally:
+            _stop_server(server)
+
+    def test_static_serves_js(self, tmp_path: Path):
+        server, port = _start_server(tmp_path)
+        try:
+            with urllib.request.urlopen(f"http://127.0.0.1:{port}/static/app.js") as resp:
+                assert resp.status == 200
+                # mimetypes maps .js to application/javascript or text/javascript per platform
+                assert "javascript" in resp.headers["Content-Type"].lower()
+        finally:
+            _stop_server(server)
+
+    def test_static_serves_fonts(self, tmp_path: Path):
+        server, port = _start_server(tmp_path)
+        try:
+            with urllib.request.urlopen(
+                f"http://127.0.0.1:{port}/static/fonts/Anton-Regular.woff2"
+            ) as resp:
+                assert resp.status == 200
+                assert resp.headers["Content-Type"] == "font/woff2"
+        finally:
+            _stop_server(server)
+
+    def test_static_traversal_blocked(self, tmp_path: Path):
+        server, port = _start_server(tmp_path)
+        try:
+            req = urllib.request.Request(f"http://127.0.0.1:{port}/static/../web.py")
+            with pytest.raises(urllib.error.HTTPError) as exc_info:
+                urllib.request.urlopen(req)
+            assert exc_info.value.code == 404
+        finally:
+            _stop_server(server)
+
+
+class TestErrorPage:
+    def test_error_page_uses_new_vhs_classes(self):
+        from repo_to_shorts.web import render_error_page
+
+        html = render_error_page("boom", 500)
+        assert "glitch-headline" in html
+        assert "data-rotate-error" in html
+        assert "tape-edge" in html
+        # Default headline before JS rotation; one of the rotating set
+        assert any(
+            phrase in html
+            for phrase in (
+                "TRACKING ERROR",
+                "TAPE ATE THE REEL",
+                "SIGNAL LOST",
+                "DROPOUT",
+                "BAD HEAD",
+            )
+        )
+        assert "boom" in html
 
 
 class TestRunWebServer:

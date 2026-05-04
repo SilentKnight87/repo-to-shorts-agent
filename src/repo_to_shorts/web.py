@@ -47,337 +47,194 @@ def _page_shell(title: str, body: str) -> str:
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>{html.escape(title)}</title>
-<style>
-:root {{
-  --bg: #050507;
-  --panel: rgba(255,255,255,.045);
-  --panel-strong: rgba(255,255,255,.075);
-  --line: rgba(255,255,255,.10);
-  --line-soft: rgba(255,255,255,.06);
-  --text: #f7f8f8;
-  --muted: #8a8f98;
-  --soft: #d0d6e0;
-  --accent: #7c72ff;
-  --accent-2: #16d9e3;
-  --good: #30d158;
-  --warn: #ffd60a;
-}}
-* {{ box-sizing: border-box; }}
-body {{
-  margin: 0;
-  min-height: 100vh;
-  color: var(--text);
-  background:
-    radial-gradient(circle at 20% 0%, rgba(124,114,255,.30), transparent 32rem),
-    radial-gradient(circle at 90% 18%, rgba(22,217,227,.18), transparent 28rem),
-    linear-gradient(180deg, #050507 0%, #090a0f 50%, #050507 100%);
-  font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-  font-feature-settings: "cv01", "ss03";
-}}
-body::before {{
-  content: "";
-  position: fixed;
-  inset: 0;
-  pointer-events: none;
-  background-image: linear-gradient(rgba(255,255,255,.035) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,.035) 1px, transparent 1px);
-  background-size: 72px 72px;
-  mask-image: linear-gradient(to bottom, rgba(0,0,0,.75), transparent 75%);
-}}
-a {{ color: var(--soft); text-decoration: none; }}
-a:hover {{ color: var(--text); }}
-.shell {{ width: min(1180px, calc(100vw - 40px)); margin: 0 auto; padding: 28px 0 64px; position: relative; }}
-.nav {{ display: flex; align-items: center; justify-content: space-between; gap: 16px; margin-bottom: 42px; }}
-.brand {{ display: flex; gap: 12px; align-items: center; font-weight: 610; letter-spacing: -.02em; }}
-.mark {{ width: 34px; height: 34px; border-radius: 10px; background: linear-gradient(135deg, var(--accent), var(--accent-2)); box-shadow: 0 0 46px rgba(124,114,255,.42); }}
-.badges {{ display: flex; flex-wrap: wrap; gap: 8px; }}
-.pill {{ border: 1px solid var(--line); background: rgba(255,255,255,.04); color: var(--soft); border-radius: 999px; padding: 7px 11px; font-size: 12px; font-weight: 520; }}
-.hero {{ display: grid; grid-template-columns: minmax(0, 1.1fr) 430px; gap: 28px; align-items: stretch; }}
-.hero-copy {{ padding: 38px 0 26px; }}
-.kicker {{ color: var(--accent-2); text-transform: uppercase; letter-spacing: .16em; font-size: 12px; font-weight: 700; margin-bottom: 18px; }}
-h1 {{ font-size: clamp(48px, 8vw, 88px); line-height: .92; letter-spacing: -0.07em; margin: 0 0 22px; font-weight: 560; max-width: 820px; }}
-.lede {{ font-size: 18px; line-height: 1.65; color: var(--muted); max-width: 690px; margin: 0; }}
-.card {{ background: linear-gradient(180deg, var(--panel-strong), var(--panel)); border: 1px solid var(--line); border-radius: 24px; box-shadow: 0 24px 80px rgba(0,0,0,.35), inset 0 1px 0 rgba(255,255,255,.08); }}
-.form-card {{ padding: 20px; }}
-.form-card h2, .section-title {{ margin: 0 0 14px; font-size: 17px; letter-spacing: -.02em; }}
-label {{ display: block; color: var(--muted); font-size: 12px; font-weight: 640; text-transform: uppercase; letter-spacing: .12em; margin: 16px 0 8px; }}
-input[type="text"] {{
-  width: 100%; min-height: 50px; padding: 0 14px; border-radius: 13px; border: 1px solid var(--line);
-  background: rgba(0,0,0,.32); color: var(--text); font-size: 14px; outline: none;
-}}
-input[type="text"]:focus {{ border-color: rgba(124,114,255,.7); box-shadow: 0 0 0 4px rgba(124,114,255,.14); }}
-.checks {{ display: grid; gap: 8px; margin: 14px 0 18px; }}
-.checks label {{ display: flex; align-items: center; gap: 10px; text-transform: none; letter-spacing: 0; margin: 0; font-size: 13px; font-weight: 520; color: var(--soft); }}
-button {{ width: 100%; min-height: 52px; border: 0; border-radius: 14px; color: white; font-weight: 720; letter-spacing: -.01em; background: linear-gradient(135deg, #6f6cff, #10c8d8); cursor: pointer; box-shadow: 0 18px 54px rgba(124,114,255,.32); }}
-button:hover {{ filter: brightness(1.08); }}
-button:disabled {{ cursor: wait; opacity: .76; filter: saturate(.9); }}
-.note {{ color: var(--muted); font-size: 12px; line-height: 1.5; margin: 12px 0 0; }}
-.loading-panel {{ display: none; margin-top: 14px; padding: 14px; border: 1px solid rgba(22,217,227,.22); border-radius: 16px; background: rgba(22,217,227,.075); color: var(--soft); line-height: 1.45; }}
-.loading-panel strong {{ display: block; color: var(--text); margin-bottom: 4px; }}
-.loading-row {{ display: flex; gap: 12px; align-items: flex-start; }}
-.spinner {{ width: 18px; height: 18px; border-radius: 999px; border: 2px solid rgba(255,255,255,.20); border-top-color: var(--accent-2); animation: spin .85s linear infinite; flex: 0 0 auto; margin-top: 2px; }}
-.form-card.is-submitting .loading-panel {{ display: block; }}
-.form-card.is-submitting .note {{ color: var(--accent-2); }}
-@keyframes spin {{ to {{ transform: rotate(360deg); }} }}
-.progress-bar-shell {{ width: 100%; height: 6px; background: rgba(255,255,255,.08); border-radius: 999px; margin-top: 14px; overflow: hidden; }}
-.progress-bar-fill {{ height: 100%; background: linear-gradient(90deg, var(--accent), var(--accent-2)); border-radius: 999px; transition: width .4s ease; }}
-.progress-stages {{ display: grid; gap: 6px; margin-top: 12px; }}
-.progress-stage {{ display: grid; grid-template-columns: 18px 1fr; gap: 8px; align-items: center; font-size: 12px; color: var(--muted); }}
-.progress-stage.done {{ color: var(--good); }}
-.progress-stage.active {{ color: var(--text); font-weight: 640; }}
-.progress-stage .dot {{ width: 8px; height: 8px; border-radius: 50%; background: currentColor; opacity: .5; }}
-.progress-stage.active .dot {{ opacity: 1; box-shadow: 0 0 8px currentColor; }}
-.progress-stage.done .dot {{ opacity: 1; }}
-
-.demo-frame {{ margin-top: 36px; display: grid; grid-template-columns: 1fr 330px; gap: 22px; }}
-.preview {{ padding: 20px; min-height: 360px; overflow: hidden; position: relative; }}
-.preview::after {{ content: ""; position: absolute; width: 260px; height: 260px; right: -80px; top: -80px; background: radial-gradient(circle, rgba(124,114,255,.32), transparent 70%); }}
-.terminal {{ background: #050507; border: 1px solid var(--line-soft); border-radius: 18px; padding: 16px; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 12px; color: #b6bed0; line-height: 1.7; }}
-.prompt {{ color: var(--accent-2); }}
-.studio-grid {{ margin-top: 36px; display: grid; grid-template-columns: 360px 1fr; gap: 22px; align-items: stretch; }}
-.phone {{ position: relative; min-height: 600px; padding: 14px; border-radius: 38px; background: linear-gradient(145deg, rgba(255,255,255,.16), rgba(255,255,255,.035)); border: 1px solid rgba(255,255,255,.16); box-shadow: 0 34px 100px rgba(0,0,0,.46), inset 0 1px 0 rgba(255,255,255,.18); }}
-.phone-screen {{ position: relative; height: 100%; min-height: 570px; overflow: hidden; border-radius: 28px; background: radial-gradient(circle at 50% 0%, rgba(22,217,227,.24), transparent 30%), linear-gradient(180deg, #131624, #06070b 72%); border: 1px solid rgba(255,255,255,.10); padding: 18px; display: flex; flex-direction: column; justify-content: space-between; }}
-.phone-screen::before {{ content: ""; position: absolute; inset: 0; background: linear-gradient(120deg, transparent, rgba(255,255,255,.08), transparent); transform: translateX(-58%); animation: sheen 5.8s ease-in-out infinite; }}
-.notch {{ width: 90px; height: 20px; border-radius: 999px; background: #050507; margin: 0 auto 24px; border: 1px solid rgba(255,255,255,.08); }}
-.reel-title {{ position: relative; font-size: 34px; line-height: .96; letter-spacing: -.06em; font-weight: 650; max-width: 260px; }}
-.reel-caption {{ position: relative; color: var(--muted); font-size: 13px; line-height: 1.5; max-width: 260px; }}
-.timeline {{ position: relative; display: grid; gap: 8px; margin: 24px 0; }}
-.timeline span {{ height: 42px; border-radius: 12px; background: linear-gradient(90deg, rgba(124,114,255,.42), rgba(22,217,227,.18)); border: 1px solid rgba(255,255,255,.10); }}
-.timeline span:nth-child(2) {{ width: 76%; background: linear-gradient(90deg, rgba(255,255,255,.18), rgba(124,114,255,.24)); }}
-.timeline span:nth-child(3) {{ width: 88%; background: linear-gradient(90deg, rgba(22,217,227,.30), rgba(255,255,255,.10)); }}
-.glass-toolbar {{ position: relative; display: flex; gap: 8px; flex-wrap: wrap; }}
-.glass-toolbar span {{ border: 1px solid rgba(255,255,255,.14); background: rgba(255,255,255,.08); border-radius: 999px; padding: 8px 10px; color: var(--soft); font-size: 11px; backdrop-filter: blur(14px); }}
-.studio-panel {{ padding: 20px; display: grid; gap: 18px; }}
-.metric-grid {{ display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; }}
-.metric {{ border: 1px solid var(--line-soft); border-radius: 18px; padding: 14px; background: rgba(255,255,255,.035); }}
-.metric strong {{ display: block; font-size: 22px; letter-spacing: -.04em; }}
-.metric span {{ color: var(--muted); font-size: 12px; }}
-.artifact-gallery {{ display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }}
-.artifact-card {{ min-height: 118px; padding: 14px; border: 1px solid var(--line-soft); border-radius: 18px; background: linear-gradient(180deg, rgba(255,255,255,.055), rgba(255,255,255,.025)); position: relative; overflow: hidden; }}
-.artifact-card::after {{ content: ""; position: absolute; width: 90px; height: 90px; right: -30px; bottom: -30px; background: radial-gradient(circle, rgba(124,114,255,.22), transparent 70%); }}
-.artifact-card strong {{ display: block; margin-bottom: 6px; }}
-.artifact-card span {{ color: var(--muted); font-size: 12px; line-height: 1.45; }}
-.status-strip {{ display: grid; gap: 8px; }}
-.status-row {{ display: flex; justify-content: space-between; gap: 14px; padding: 10px 0; border-bottom: 1px solid var(--line-soft); color: var(--muted); font-size: 13px; }}
-.status-row strong {{ color: var(--soft); }}
-@keyframes sheen {{ 0%, 55% {{ transform: translateX(-64%); }} 100% {{ transform: translateX(64%); }} }}
-.steps {{ padding: 20px; }}
-.step {{ display: grid; grid-template-columns: 26px 1fr; gap: 10px; padding: 13px 0; border-bottom: 1px solid var(--line-soft); }}
-.step:last-child {{ border-bottom: 0; }}
-.num {{ width: 26px; height: 26px; border-radius: 50%; display: grid; place-items: center; background: rgba(124,114,255,.16); color: #c7c3ff; font-size: 12px; font-weight: 700; }}
-.step strong {{ display: block; font-size: 14px; }}
-.step span {{ color: var(--muted); font-size: 13px; line-height: 1.45; }}
-.runs {{ margin-top: 24px; display: grid; gap: 12px; }}
-.run {{ padding: 14px; display: flex; align-items: center; justify-content: space-between; gap: 16px; }}
-.run-name {{ font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 12px; color: var(--soft); }}
-.links {{ display: flex; flex-wrap: wrap; gap: 8px; justify-content: flex-end; }}
-.links a {{ border: 1px solid var(--line); background: rgba(255,255,255,.04); border-radius: 999px; padding: 7px 10px; font-size: 12px; }}
-.result-grid {{ display: grid; grid-template-columns: minmax(0, 430px) 1fr; gap: 24px; align-items: start; }}
-.video-card {{ padding: 14px; }}
-video {{ width: 100%; max-height: 76vh; border-radius: 18px; background: #000; border: 1px solid var(--line); }}
-.meta {{ padding: 22px; }}
-.meta h1 {{ font-size: clamp(34px, 5vw, 58px); }}
-.scene-list {{ display: grid; gap: 10px; margin: 18px 0; padding: 0; list-style: none; }}
-.scene-list li {{ padding: 14px; border: 1px solid var(--line-soft); border-radius: 14px; background: rgba(255,255,255,.035); color: var(--soft); }}
-.status {{ display: flex; flex-wrap: wrap; gap: 8px; margin: 16px 0; }}
-.error {{ padding: 24px; border-color: rgba(255,69,58,.3); }}
-@media (max-width: 900px) {{ .hero, .demo-frame, .studio-grid, .result-grid {{ grid-template-columns: 1fr; }} .metric-grid, .artifact-gallery {{ grid-template-columns: 1fr; }} .shell {{ width: min(100vw - 24px, 1180px); }} }}
-</style>
+<link rel="preload" as="font" type="font/woff2" href="/static/fonts/Anton-Regular.woff2" crossorigin>
+<link rel="preload" as="font" type="font/woff2" href="/static/fonts/JetBrainsMono-Variable.woff2" crossorigin>
+<link rel="stylesheet" href="/static/style.css">
 </head>
 <body><main class="shell">{body}</main>
-<script>
-document.addEventListener("DOMContentLoaded", () => {{
-  const form = document.getElementById("generate-form");
-  if (!form) return;
-
-  const sessionInput = document.getElementById("session-id");
-  const detailEl = document.getElementById("progress-detail");
-  const barFill = document.getElementById("progress-bar-fill");
-  const stagesEl = document.getElementById("progress-stages");
-  let pollInterval = null;
-
-  function uuid() {{
-    return "xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx".replace(/[xy]/g, c => {{
-      const r = Math.random() * 16 | 0;
-      return (c === "x" ? r : (r & 0x3 | 0x8)).toString(16);
-    }});
-  }}
-
-  function renderStages(stages, active) {{
-    if (!stagesEl) return;
-    stagesEl.innerHTML = stages.map(s => {{
-      const cls = s.status === "complete" ? "done" : (s.name === active ? "active" : "");
-      return `<div class="progress-stage ${{cls}}"><div class="dot"></div><div>${{html_escape(s.label)}}</div></div>`;
-    }}).join("");
-  }}
-
-  function html_escape(str) {{
-    const div = document.createElement("div");
-    div.textContent = str;
-    return div.innerHTML;
-  }}
-
-  async function pollProgress(sessionId) {{
-    try {{
-      const res = await fetch(`/progress?session=${{encodeURIComponent(sessionId)}}`);
-      const data = await res.json();
-      if (barFill) barFill.style.width = (data.percent || 0) + "%";
-      if (detailEl && data.active_detail) detailEl.textContent = data.active_detail;
-      if (detailEl && data.error) detailEl.textContent = "Error: " + data.error;
-      renderStages(data.stages || [], data.active_stage);
-      if (data.percent >= 100 || data.error) {{
-        clearInterval(pollInterval);
-        pollInterval = null;
-      }}
-    }} catch (e) {{
-      // ignore polling errors
-    }}
-  }}
-
-  form.addEventListener("submit", (event) => {{
-    if (form.dataset.submitting === "true") {{
-      event.preventDefault();
-      return;
-    }}
-
-    event.preventDefault();
-    form.dataset.submitting = "true";
-    form.classList.add("is-submitting");
-    form.setAttribute("aria-busy", "true");
-
-    const sid = uuid();
-    if (sessionInput) sessionInput.value = sid;
-
-    const button = form.querySelector('button[type="submit"]');
-    if (button) {{
-      button.disabled = true;
-      button.textContent = "Generating…";
-    }}
-
-    renderStages([
-      {{name:"ingest", label:"Ingesting repo", status:"pending"}},
-      {{name:"analyze", label:"Analyzing structure", status:"pending"}},
-      {{name:"kimi_brief", label:"Writing creative brief", status:"pending"}},
-      {{name:"render_frames", label:"Rendering frames", status:"pending"}},
-      {{name:"tts", label:"Generating voice", status:"pending"}},
-      {{name:"compose", label:"Composing video", status:"pending"}},
-      {{name:"finalize", label:"Packaging artifacts", status:"pending"}},
-    ], "ingest");
-
-    pollProgress(sid);
-    pollInterval = setInterval(() => pollProgress(sid), 1500);
-
-    window.setTimeout(() => {{
-      HTMLFormElement.prototype.submit.call(form);
-    }}, 80);
-  }});
-}});
-</script>
+<script src="/static/app.js" defer></script>
 </body>
 </html>"""
 
 
 def render_home_page(runs: list[Path], message: str | None = None) -> str:
-    run_items = []
-    for run in runs:
-        artifacts = []
-        for name in ("demo.mp4", "metadata.json", "demo.html", "kimi_critique.md"):
-            if (run / name).exists():
-                artifacts.append(f'<a href="/runs/{html.escape(run.name)}/{html.escape(name)}">{html.escape(name)}</a>')
-        links = "".join(artifacts) or '<span class="note">no artifacts yet</span>'
-        run_items.append(f'<article class="card run"><div class="run-name">{html.escape(run.name)}</div><div class="links">{links}</div></article>')
-    runs_html = "\n".join(run_items) or '<article class="card run"><div class="run-name">No runs yet. Paste a repo and make one.</div></article>'
-    message_html = f'<div class="pill">{html.escape(message)}</div>' if message else ""
+    archive_rows = []
+    for idx, run in enumerate(runs, start=1):
+        reel_no = f"{idx:03d}"
+        date_part = run.name.split("-")[0] if "-" in run.name else run.name
+        if len(date_part) == 8 and date_part.isdigit():
+            display_date = f"{date_part[0:4]}-{date_part[4:6]}-{date_part[6:8]}"
+        else:
+            display_date = html.escape(date_part)
+        primary_target = None
+        for candidate in ("demo.mp4", "demo.html", "metadata.json"):
+            if (run / candidate).exists():
+                primary_target = candidate
+                break
+        if primary_target:
+            href = f"/runs/{html.escape(run.name)}/{html.escape(primary_target)}"
+            link_html = f'<a class="btn-tape btn-tape--ghost" href="{href}">⏬ MASTER</a>'
+        else:
+            link_html = '<span class="btn-tape btn-tape--ghost is-idle">NO MASTER</span>'
+        archive_rows.append(
+            '<div class="tape-label">'
+            f'<span class="tape-label__reel">REEL · {reel_no}</span>'
+            f'<span class="tape-label__date">{display_date}</span>'
+            '<span class="tape-label__runtime">60s</span>'
+            f'<span class="tape-label__name">{html.escape(run.name)}</span>'
+            f'{link_html}'
+            "</div>"
+        )
+    if archive_rows:
+        archive_html = "\n".join(archive_rows)
+    else:
+        archive_html = (
+            '<div class="tape-label tape-label--empty">'
+            '<span class="tape-label__reel">NO TAPES IN ARCHIVE — ROLL ONE TO START.</span>'
+            "</div>"
+        )
+
+    message_html = (
+        f'<div class="status-pill is-live">{html.escape(message)}</div>' if message else ""
+    )
+
+    colorbars = (
+        '<div class="colorbars colorbars--banner" aria-hidden="true">'
+        '<div class="colorbars__bar colorbars__bar--silver"></div>'
+        '<div class="colorbars__bar colorbars__bar--yellow"></div>'
+        '<div class="colorbars__bar colorbars__bar--cyan"></div>'
+        '<div class="colorbars__bar colorbars__bar--green"></div>'
+        '<div class="colorbars__bar colorbars__bar--magenta"></div>'
+        '<div class="colorbars__bar colorbars__bar--red"></div>'
+        '<div class="colorbars__bar colorbars__bar--blue"></div>'
+        "</div>"
+    )
+
+    vu_segments = "".join("<span></span>" for _ in range(20))
 
     body = f"""
-<nav class="nav">
-  <div class="brand"><div class="mark"></div><span>Repo-to-Shorts Agent</span></div>
-  <div class="badges"><span class="pill">Hermes Agent</span><span class="pill">Kimi 2.6</span><span class="pill">Vertical MP4</span></div>
-</nav>
+<div class="tape-edge tape-edge--top" aria-hidden="true"></div>
+<header class="slate">
+  <span class="slate-state is-rec">● REC</span>
+  <span class="slate-title">CH 02 — HERMES STUDIO</span>
+  <span class="slate-tc" data-timecode>00:00:00:00</span>
+</header>
+{colorbars}
 <section class="hero">
-  <div class="hero-copy">
-    <div class="kicker">Creative hackathon demo machine</div>
-    <h1>Turn a GitHub repo into a cinematic launch short.</h1>
-    <p class="lede">Paste a repo. Kimi writes the creative brief. Hermes turns code structure into narration, motion, captions, and a downloadable 9:16 demo video. The submission is meta: this app generates the video about itself.</p>
-    {message_html}
-  </div>
-  <form id="generate-form" class="card form-card" method="POST" action="/generate">
-    <h2>Generate a short</h2>
-    <label>Target repo or GitHub URL</label>
-    <input type="text" name="target" placeholder="https://github.com/owner/repo or local path like ." required>
-    <label>Audience</label>
-    <input type="text" name="audience" value="{html.escape(DEFAULT_AUDIENCE)}">
-    <label>Kimi model</label>
-    <input type="text" name="kimi_model" value="{html.escape(DEFAULT_KIMI_MODEL)}">
-    <div class="checks">
-      <label><input type="checkbox" name="creative_mode" checked> Creative short: animated, narrated, hackathon-ready</label>
-      <label><input type="checkbox" name="preview" checked> Fast preview: ~13s at 12fps for iteration</label>
-      <label><input type="checkbox" name="skip_audio" checked> Skip audio for fastest visual loop</label>
-      <label><input type="checkbox" name="render_mp4"> Classic MP4 fallback</label>
-    </div>
-    <input type="hidden" name="session_id" value="" id="session-id">
-    <button type="submit">Generate short package</button>
-    <div class="loading-panel" role="status" aria-live="polite" aria-atomic="true">
-      <div class="loading-row">
-        <div class="spinner" aria-hidden="true"></div>
-        <div>
-          <strong>Generating your short package…</strong>
-          <span id="progress-detail">Analyzing the repo, writing the Kimi creative brief, rendering motion, and packaging artifacts. Fast preview is the default loop; uncheck Skip audio for a voice/music smoke test, and uncheck Fast preview only for final export.</span>
-        </div>
-      </div>
-      <div class="progress-bar-shell" id="progress-bar-shell"><div class="progress-bar-fill" id="progress-bar-fill" style="width:0%"></div></div>
-      <div class="progress-stages" id="progress-stages"></div>
-    </div>
-    <p class="note">Default mode is fast visual preview, around 20 seconds. Uncheck Skip audio for a ~40 second audio preview. Full final export is deliberately last.</p>
-  </form>
+  <div class="kicker">// SIGNAL IN. STORY OUT.</div>
+  <h1 class="glitch-headline" data-glitch>REPO &rarr; REEL.</h1>
+  <p class="lede">Paste a repo. Kimi writes the brief. Hermes cuts the reel.</p>
+  {message_html}
 </section>
-<section class="studio-grid" aria-label="Studio preview">
-  <div class="phone" aria-hidden="true">
-    <div class="phone-screen">
-      <div>
-        <div class="notch"></div>
-        <div class="kicker">Live preview</div>
-        <div class="reel-title">Repo signal, edited like a launch film.</div>
-        <div class="timeline"><span></span><span></span><span></span></div>
-        <p class="reel-caption">A vertical storyboard with code architecture, narration beats, captions, and proof metadata — ready to screen-record or export.</p>
-      </div>
-      <div class="glass-toolbar"><span>1080×1920</span><span>Kimi brief</span><span>Captions</span><span>MP4 optional</span></div>
+<form id="generate-form" class="deck deck-control" method="POST" action="/generate">
+  <div class="tape-input">
+    <label class="tape-input__label" for="field-target">CH · INPUT</label>
+    <input class="tape-input__field" type="text" id="field-target" name="target" placeholder="https://github.com/owner/repo" required>
+  </div>
+  <div class="tape-input">
+    <label class="tape-input__label" for="field-audience">AUDIENCE TARGET</label>
+    <input class="tape-input__field" type="text" id="field-audience" name="audience" value="{html.escape(DEFAULT_AUDIENCE)}">
+  </div>
+  <div class="tape-input">
+    <label class="tape-input__label" for="field-kimi">MODEL FEED</label>
+    <input class="tape-input__field" type="text" id="field-kimi" name="kimi_model" value="{html.escape(DEFAULT_KIMI_MODEL)}">
+  </div>
+  <div class="toggle-row">
+    <div class="toggle-mode" role="radiogroup" aria-label="Tape mode">
+      <span class="toggle-mode__caption">MODE</span>
+      <div class="toggle-mode__pill is-lit" data-tape-mode="sp" role="radio" tabindex="0" aria-checked="true">SP</div>
+      <div class="toggle-mode__pill" data-tape-mode="lp" role="radio" tabindex="-1" aria-checked="false">LP</div>
+      <div class="toggle-mode__pill" data-tape-mode="ep" role="radio" tabindex="-1" aria-checked="false">EP</div>
+    </div>
+    <div class="toggle-mode" role="radiogroup" aria-label="Audio mode">
+      <span class="toggle-mode__caption">AUDIO</span>
+      <div class="toggle-mode__pill" data-audio-mode="dolby" role="radio" tabindex="-1" aria-checked="false">DOLBY</div>
+      <div class="toggle-mode__pill is-lit" data-audio-mode="off" role="radio" tabindex="0" aria-checked="true">OFF</div>
     </div>
   </div>
-  <div class="card studio-panel">
-    <div>
-      <div class="section-title">Demo cockpit</div>
-      <p class="lede">Not a form. A command center for turning repo evidence into a polished short package: creative direction, motion plan, video preview, and judge-facing artifacts.</p>
-    </div>
-    <div class="metric-grid">
-      <div class="metric"><strong>7</strong><span>generation stages with live status</span></div>
-      <div class="metric"><strong>9:16</strong><span>cinematic vertical output</span></div>
-      <div class="metric"><strong>0 keys</strong><span>required for deterministic fallback</span></div>
-    </div>
-    <div class="artifact-gallery" aria-label="Generated artifact gallery">
-      <div class="artifact-card"><strong>Launch video</strong><span>demo.mp4 when rendering is enabled, or a browser-recordable demo.html fallback.</span></div>
-      <div class="artifact-card"><strong>Creative system</strong><span>Kimi critique, storyboard, narration script, captions, and scene-by-scene visual direction.</span></div>
-      <div class="artifact-card"><strong>Proof layer</strong><span>metadata.json records model mode, render mode, artifact manifest, and reproducible run path.</span></div>
-      <div class="artifact-card"><strong>Submission kit</strong><span>X post, Discord copy, architecture SVG, and recording notes for a clean hackathon handoff.</span></div>
-    </div>
-    <div class="terminal">
-      <span class="prompt">repo-shorts</span> ingest GitHub URL<br>
-      <span class="prompt">kimi-2.6</span> sharpen hook + creative direction<br>
-      <span class="prompt">renderer</span> compose cinematic architecture scenes<br>
-      <span class="prompt">proof</span> package every artifact for review
-    </div>
+  <input type="hidden" name="creative_mode" value="on" data-flag="creative_mode">
+  <input type="hidden" name="preview" value="on" data-flag="preview">
+  <input type="hidden" name="skip_audio" value="on" data-flag="skip_audio">
+  <input type="hidden" name="" value="" data-flag="render_mp4">
+  <input type="hidden" name="session_id" value="" id="session-id">
+  <div class="btn-row">
+    <button type="button" class="btn-tape btn-tape--ghost" data-action="ingest">⏏ INGEST</button>
+    <button type="submit" class="btn-tape btn-tape--primary">▶ ROLL TAPE</button>
+    <button type="button" class="btn-tape btn-tape--ghost" data-action="fallbacks" aria-pressed="false">⚙ FALLBACKS</button>
   </div>
+  <div class="deck-divider" aria-hidden="true"></div>
+  <div class="channel-row" data-stage="kimi" data-state="stby">
+    <span class="ch-label">CH·KIMI</span>
+    <div class="ch-bar"><div class="ch-fill"></div></div>
+    <span class="ch-status">READY</span>
+  </div>
+  <div class="channel-row" data-stage="hermes" data-state="stby">
+    <span class="ch-label">CH·HERMES</span>
+    <div class="ch-bar"><div class="ch-fill"></div></div>
+    <span class="ch-status">READY</span>
+  </div>
+  <div class="channel-row" data-stage="tape" data-state="stby">
+    <span class="ch-label">CH·TAPE</span>
+    <div class="ch-bar"><div class="ch-fill"></div></div>
+    <span class="ch-status">READY</span>
+  </div>
+  <div class="channel-row" data-stage="output" data-state="idle">
+    <span class="ch-label">CH·OUTPUT</span>
+    <div class="ch-bar"><div class="ch-fill"></div></div>
+    <span class="ch-status">IDLE</span>
+  </div>
+  <div class="deck deck-broadcasting" data-broadcasting hidden>
+    <div class="kicker">// NOW BROADCASTING</div>
+    <div class="glitch-headline" data-glitch>RENDERING FRAMES&hellip;</div>
+    <div class="channel-row" data-stage="ingest" data-state="stby">
+      <span class="ch-label">▣ INGEST</span>
+      <div class="ch-bar"><div class="ch-fill"></div></div>
+      <span class="ch-status">STBY</span>
+    </div>
+    <div class="channel-row" data-stage="analyze" data-state="stby">
+      <span class="ch-label">▣ ANALYZE</span>
+      <div class="ch-bar"><div class="ch-fill"></div></div>
+      <span class="ch-status">STBY</span>
+    </div>
+    <div class="channel-row" data-stage="kimi_brief" data-state="stby">
+      <span class="ch-label">▣ KIMI BRIEF</span>
+      <div class="ch-bar"><div class="ch-fill"></div></div>
+      <span class="ch-status">STBY</span>
+    </div>
+    <div class="channel-row" data-stage="render_frames" data-state="stby">
+      <span class="ch-label">○ FRAMES</span>
+      <div class="ch-bar"><div class="ch-fill"></div></div>
+      <span class="ch-status">STBY</span>
+    </div>
+    <div class="channel-row" data-stage="tts" data-state="stby">
+      <span class="ch-label">○ NARRATION</span>
+      <div class="ch-bar"><div class="ch-fill"></div></div>
+      <span class="ch-status">STBY</span>
+    </div>
+    <div class="channel-row" data-stage="compose" data-state="stby">
+      <span class="ch-label">○ COMPOSE</span>
+      <div class="ch-bar"><div class="ch-fill"></div></div>
+      <span class="ch-status">STBY</span>
+    </div>
+    <div class="channel-row" data-stage="finalize" data-state="stby">
+      <span class="ch-label">○ MASTER</span>
+      <div class="ch-bar"><div class="ch-fill"></div></div>
+      <span class="ch-status">STBY</span>
+    </div>
+    <div class="vu-meter" aria-hidden="true">{vu_segments}</div>
+  </div>
+</form>
+<section class="tape-archive">
+  <h2 class="section-heading">TAPE ARCHIVE</h2>
+  {archive_html}
 </section>
-<section>
-  <h2 class="section-title">Latest runs</h2>
-  <div class="runs">{runs_html}</div>
-</section>
+<div class="scope-strip" aria-hidden="true">TBC · SC-H · DROPOUT 0.0% · AGC ON · 1080×1920 · 30FPS</div>
+<div class="tape-edge tape-edge--bottom" aria-hidden="true"></div>
 """
     return _page_shell("Repo-to-Shorts Agent", body)
 
 
 def render_success_page(run_dir: Path, run_metadata: dict) -> str:
-    artifacts = []
-    artifact_cards = []
     artifact_copy = {
         "demo.mp4": "Vertical video export for direct playback.",
         "demo.html": "Browser-recordable motion preview fallback.",
@@ -386,55 +243,193 @@ def render_success_page(run_dir: Path, run_metadata: dict) -> str:
         "storyboard.md": "Scene beats and narration structure.",
         "captions.srt": "Caption timing for social video.",
     }
+    artifact_tiles = []
     for name in run_metadata.get("artifacts", []):
         safe_name = html.escape(name)
         href = f"/runs/{html.escape(run_dir.name)}/{safe_name}"
-        artifacts.append(f'<a href="{href}">{safe_name}</a>')
         description = artifact_copy.get(name, "Downloadable artifact from this run.")
-        artifact_cards.append(f'<a class="artifact-card" href="{href}"><strong>{safe_name}</strong><span>{html.escape(description)}</span></a>')
+        artifact_tiles.append(
+            f'<a class="tape-label tape-label--artifact" href="{href}">'
+            f'<span class="tape-label__name">{safe_name}</span>'
+            f'<span class="tape-label__desc">{html.escape(description)}</span>'
+            "</a>"
+        )
 
-    kimi_info = run_metadata.get("kimi", {})
-    render_info = run_metadata.get("render", {})
-    brief = run_metadata.get("creative_brief", {})
+    kimi_info = run_metadata.get("kimi", {}) if isinstance(run_metadata.get("kimi"), dict) else {}
+    render_info = run_metadata.get("render", {}) if isinstance(run_metadata.get("render"), dict) else {}
+    brief = run_metadata.get("creative_brief", {}) if isinstance(run_metadata.get("creative_brief"), dict) else {}
     scenes = brief.get("scenes", []) if isinstance(brief, dict) else []
-    scenes_html = "\n".join(
-        f'<li><strong>{idx + 1}. {html.escape(scene.get("visual_tool", "scene"))}</strong><br>{html.escape(scene.get("narration", ""))}</li>'
-        for idx, scene in enumerate(scenes)
-    )
+    title_text = brief.get("title", "Broadcast complete") if isinstance(brief, dict) else "Broadcast complete"
+    hook_text = brief.get("hook", "") if isinstance(brief, dict) else ""
+
+    scene_rows = []
+    for idx, scene in enumerate(scenes, start=1):
+        if not isinstance(scene, dict):
+            continue
+        scene_rows.append(
+            '<div class="scene-row channel-row" data-stage="scene">'
+            f'<span class="ch-label scene-row__num">{idx:02d}</span>'
+            f'<span class="scene-row__tool">{html.escape(str(scene.get("visual_tool", "scene")).upper())}</span>'
+            f'<span class="scene-row__narration">{html.escape(str(scene.get("narration", "")))}</span>'
+            "</div>"
+        )
+    if not scene_rows:
+        scene_rows.append('<div class="scene-row scene-row--empty">No scenes recorded.</div>')
+
     video_html = ""
-    if (run_dir / "demo.mp4").exists():
+    has_video = (run_dir / "demo.mp4").exists()
+    if has_video:
         video_url = f"/runs/{html.escape(run_dir.name)}/demo.mp4"
-        video_html = f'<video controls playsinline src="{video_url}"></video>'
+        video_html = (
+            '<div class="crt-viewport">'
+            f'<video class="crt-viewport__video" controls playsinline src="{video_url}"></video>'
+            '<div class="crt-viewport__overlay" aria-hidden="true"></div>'
+            "</div>"
+        )
+    else:
+        video_html = (
+            '<div class="crt-viewport crt-viewport--empty">'
+            '<div class="crt-viewport__overlay" aria-hidden="true">● NO SIGNAL</div>'
+            "</div>"
+        )
+
+    reel_no = "001"
+    head_part = run_dir.name.split("-")[0] if "-" in run_dir.name else ""
+    if head_part.isdigit() and len(head_part) >= 3:
+        reel_no = head_part[-3:]
+
+    runtime_text = "00:01:00"
+    if isinstance(render_info, dict) and render_info.get("duration"):
+        runtime_text = html.escape(str(render_info.get("duration")))
+
+    kimi_mode = html.escape(str(kimi_info.get("mode", "unknown"))) if isinstance(kimi_info, dict) else "unknown"
+    render_mode = html.escape(str(render_info.get("mode", "unknown"))) if isinstance(render_info, dict) else "unknown"
+    renderer_name = html.escape(str(render_info.get("renderer", "unknown"))) if isinstance(render_info, dict) else "unknown"
+
+    kimi_pill_class = "is-lock" if kimi_mode == "live-api" else "is-rec"
+    render_pill_class = "is-lock" if render_mode in ("mp4", "live-api") else "is-rec"
+
+    primary_download_html = ""
+    if has_video:
+        primary_download_html = (
+            f'<a class="btn-tape btn-tape--primary" href="/runs/{html.escape(run_dir.name)}/demo.mp4">⏬ MASTER</a>'
+        )
+    else:
+        for fallback in ("demo.html", "metadata.json"):
+            if (run_dir / fallback).exists():
+                primary_download_html = (
+                    f'<a class="btn-tape btn-tape--primary" href="/runs/{html.escape(run_dir.name)}/{fallback}">⏬ {html.escape(fallback.upper())}</a>'
+                )
+                break
+
+    secondary_download_html = ""
+    if has_video and (run_dir / "demo.html").exists():
+        secondary_download_html = (
+            f'<a class="btn-tape btn-tape--ghost" href="/runs/{html.escape(run_dir.name)}/demo.html">⏬ HTML PROOF</a>'
+        )
+
+    colorbars = (
+        '<div class="colorbars colorbars--banner" aria-hidden="true">'
+        '<div class="colorbars__bar colorbars__bar--silver"></div>'
+        '<div class="colorbars__bar colorbars__bar--yellow"></div>'
+        '<div class="colorbars__bar colorbars__bar--cyan"></div>'
+        '<div class="colorbars__bar colorbars__bar--green"></div>'
+        '<div class="colorbars__bar colorbars__bar--magenta"></div>'
+        '<div class="colorbars__bar colorbars__bar--red"></div>'
+        '<div class="colorbars__bar colorbars__bar--blue"></div>'
+        "</div>"
+    )
+
+    artifact_block = (
+        "\n".join(artifact_tiles)
+        if artifact_tiles
+        else '<div class="tape-label tape-label--empty"><span class="tape-label__name">No artifacts listed.</span></div>'
+    )
 
     body = f"""
-<nav class="nav"><a class="brand" href="/"><div class="mark"></div><span>Repo-to-Shorts Agent</span></a><div class="badges"><a class="pill" href="/">New run</a></div></nav>
+<div class="tape-edge tape-edge--top" aria-hidden="true"></div>
+<header class="slate slate--lock">
+  <span class="slate-state is-lock">▣ SIGNAL LOCKED</span>
+  <span class="slate-title">REEL.{reel_no} — MASTER</span>
+  <span class="slate-tc">00:01:00:00</span>
+</header>
+{colorbars}
+<section class="hero hero--success">
+  <div class="kicker">// BROADCAST COMPLETE</div>
+  <h1 class="glitch-headline glitch-headline--md">{html.escape(str(title_text))}</h1>
+  <p class="lede">{html.escape(str(hook_text))}</p>
+</section>
 <section class="result-grid">
-  <div class="card video-card">{video_html or '<p class="note">No video artifact found.</p>'}</div>
-  <div class="card meta">
-    <div class="kicker">Generation complete</div>
-    <h1>{html.escape(brief.get('title', 'Generation complete') if isinstance(brief, dict) else 'Generation complete')}</h1>
-    <p class="lede">{html.escape(brief.get('hook', '') if isinstance(brief, dict) else '')}</p>
-    <div class="status">
-      <span class="pill">Kimi: {html.escape(kimi_info.get('mode', 'unknown'))}</span>
-      <span class="pill">Render: {html.escape(render_info.get('mode', 'unknown'))}</span>
-      <span class="pill">Renderer: {html.escape(render_info.get('renderer', 'unknown'))}</span>
+  <div class="deck master-viewer">
+    {video_html}
+    <dl class="master-meta">
+      <div class="master-meta__row"><dt>TAPE</dt><dd>REEL.{reel_no}</dd></div>
+      <div class="master-meta__row"><dt>KIMI</dt><dd>{kimi_mode}</dd></div>
+      <div class="master-meta__row"><dt>MASTER</dt><dd>1080×1920</dd></div>
+      <div class="master-meta__row"><dt>RUNTIME</dt><dd>{runtime_text}</dd></div>
+    </dl>
+    <div class="status-row">
+      <span class="status-pill {kimi_pill_class}">KIMI · {kimi_mode}</span>
+      <span class="status-pill {render_pill_class}">RENDER · {render_mode}</span>
+      <span class="status-pill is-idle">RENDERER · {renderer_name}</span>
     </div>
-    <p class="note">Run: <code>{html.escape(str(run_dir))}</code></p>
-    <h2 class="section-title">Artifact gallery</h2>
-    <div class="artifact-gallery">{''.join(artifact_cards) or '<p class="note">No artifacts listed in metadata.</p>'}</div>
-    <h2 class="section-title">Creative brief</h2>
-    <ul class="scene-list">{scenes_html}</ul>
-    <div class="links">{''.join(artifacts)}</div>
+    <div class="btn-row btn-row--transport">
+      {primary_download_html}
+      <a class="btn-tape btn-tape--ghost" href="/">⏏ NEW REEL</a>
+      {secondary_download_html}
+    </div>
+    <p class="caption">RUN · <code>{html.escape(str(run_dir))}</code></p>
+  </div>
+  <aside class="deck cue-sheet">
+    <h2 class="section-heading">BROADCAST CUE SHEET</h2>
+    {''.join(scene_rows)}
+  </aside>
+</section>
+<section class="artifact-tiles">
+  <h2 class="section-heading">ARTIFACTS</h2>
+  <div class="artifact-tiles__grid">
+    {artifact_block}
   </div>
 </section>
+<div class="scope-strip" aria-hidden="true">TBC · SC-H · DROPOUT 0.0% · AGC ON · 1080×1920 · 30FPS</div>
+<div class="tape-edge tape-edge--bottom" aria-hidden="true"></div>
 """
     return _page_shell("Generation complete", body)
 
 
 def render_error_page(message: str, status: int = 400) -> str:
+    colorbars_broken = (
+        '<div class="colorbars colorbars--banner colorbars--broken" aria-hidden="true">'
+        '<div class="colorbars__bar colorbars__bar--silver"></div>'
+        '<div class="colorbars__bar colorbars__bar--yellow"></div>'
+        '<div class="colorbars__bar colorbars__bar--cyan"></div>'
+        '<div class="colorbars__bar colorbars__bar--green"></div>'
+        '<div class="colorbars__bar colorbars__bar--magenta"></div>'
+        '<div class="colorbars__bar colorbars__bar--red"></div>'
+        '<div class="colorbars__bar colorbars__bar--blue"></div>'
+        "</div>"
+    )
+
     body = f"""
-<nav class="nav"><a class="brand" href="/"><div class="mark"></div><span>Repo-to-Shorts Agent</span></a></nav>
-<section class="card error"><div class="kicker">Error {status}</div><h1>Generation hit a wall.</h1><p class="lede">{html.escape(message)}</p><p><a class="pill" href="/">Back to home</a></p></section>
+<div class="tape-edge tape-edge--top tape-edge--dropout" aria-hidden="true"></div>
+<header class="slate slate--error">
+  <span class="slate-state is-rec">● SIGNAL LOST</span>
+  <span class="slate-title">CH 02 — TRACKING ERROR</span>
+  <span class="slate-tc">--:--:--:--</span>
+</header>
+{colorbars_broken}
+<section class="hero hero--error">
+  <div class="kicker">// TAPE ATE THE REEL.</div>
+  <h1 class="glitch-headline glitch-headline--error" data-rotate-error>TRACKING ERROR.</h1>
+</section>
+<section class="deck error-log">
+  <pre class="error-message">! {html.escape(message)}</pre>
+</section>
+<div class="btn-row btn-row--center">
+  <a class="btn-tape btn-tape--primary" href="/">⏏ EJECT TAPE</a>
+</div>
+<div class="scope-strip" aria-hidden="true">STATUS {status} · TRACKING ERROR · TAPE EJECTED</div>
+<div class="tape-edge tape-edge--bottom tape-edge--dropout" aria-hidden="true"></div>
 """
     return _page_shell(f"Error {status}", body)
 
@@ -448,9 +443,28 @@ def resolve_run_file(runs_dir: Path, request_path: str) -> Path:
     return candidate
 
 
+STATIC_DIR = Path(__file__).resolve().parent / "static"
+
+
+def resolve_static_file(request_path: str) -> Path:
+    relative = request_path.removeprefix("/static/")
+    candidate = (STATIC_DIR / relative).resolve()
+    static_resolved = STATIC_DIR.resolve()
+    if static_resolved not in candidate.parents and candidate != static_resolved:
+        raise ValueError("path escapes static directory")
+    return candidate
+
+
 def _guess_content_type(path: Path) -> str:
     ctype, _ = mimetypes.guess_type(str(path))
-    return ctype or "application/octet-stream"
+    if ctype:
+        return ctype
+    suffix = path.suffix.lower()
+    if suffix == ".woff2":
+        return "font/woff2"
+    if suffix == ".woff":
+        return "font/woff"
+    return "application/octet-stream"
 
 
 def _make_handler(runs_dir: Path):
@@ -506,6 +520,32 @@ def _make_handler(runs_dir: Path):
                 self.send_header("Content-Type", "text/html; charset=utf-8")
                 self.end_headers()
                 self.wfile.write(body)
+                return
+
+            if path.startswith("/static/"):
+                try:
+                    file_path = resolve_static_file(path)
+                except ValueError:
+                    self.send_response(404)
+                    self.send_header("Content-Type", "text/plain; charset=utf-8")
+                    self.end_headers()
+                    self.wfile.write(b"Not found")
+                    return
+
+                if not file_path.exists() or file_path.is_dir():
+                    self.send_response(404)
+                    self.send_header("Content-Type", "text/plain; charset=utf-8")
+                    self.end_headers()
+                    self.wfile.write(b"Not found")
+                    return
+
+                self.send_response(200)
+                self.send_header("Content-Type", _guess_content_type(file_path))
+                self.send_header("Content-Length", str(file_path.stat().st_size))
+                self.send_header("Cache-Control", "public, max-age=3600")
+                self.end_headers()
+                with file_path.open("rb") as f:
+                    self.wfile.write(f.read())
                 return
 
             if path.startswith("/runs/"):
