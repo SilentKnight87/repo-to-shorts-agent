@@ -1,8 +1,12 @@
 from __future__ import annotations
 
 import json
+import shutil
+import subprocess
 from pathlib import Path
 from typing import Any
+
+from repo_to_shorts.render import RenderConfig, RenderResult
 
 DEFAULT_ARTIFACTS = ["demo.mp4", "metadata.json", "captions.srt", "submission_pack.md"]
 DEFAULT_SCENE_TYPES = [
@@ -55,6 +59,102 @@ def write_remotion_input(run_dir: Path, data: dict[str, Any]) -> Path:
     return path
 
 
+def remotion_available(project_root: Path | None = None) -> bool:
+    root = project_root or Path.cwd()
+    package_json = root / "package.json"
+    if shutil.which("node") is None or shutil.which("npm") is None:
+        return False
+    if not package_json.exists():
+        return False
+    try:
+        package_data = json.loads(package_json.read_text(encoding="utf-8"))
+    except json.JSONDecodeError:
+        return False
+    scripts = package_data.get("scripts")
+    return isinstance(scripts, dict) and "render:remotion" in scripts
+
+
+def render_remotion_video(
+    run_dir: Path,
+    scenes: list[dict[str, Any]],
+    *,
+    repo_name: str,
+    description: str,
+    key_files: list[str],
+    proof: dict[str, Any],
+    config: RenderConfig | None = None,
+    project_root: Path | None = None,
+) -> RenderResult:
+    scene_count = len(scenes)
+    if not remotion_available(project_root):
+        return RenderResult(
+            output_path=None,
+            mode="mp4",
+            renderer="remotion",
+            scene_count=scene_count,
+            error="Remotion unavailable: node/npm/package script missing",
+        )
+
+    cfg = config or RenderConfig()
+    input_path = write_remotion_input(
+        run_dir,
+        build_remotion_input(
+            repo_name=repo_name,
+            description=description,
+            key_files=key_files,
+            scenes=scenes,
+            proof=proof,
+            width=cfg.width,
+            height=cfg.height,
+            fps=cfg.fps,
+            duration_seconds=_duration_seconds(scenes, cfg),
+        ),
+    )
+    output_path = Path(run_dir) / cfg.output_name
+    command = [
+        "npm",
+        "run",
+        "render:remotion",
+        "--",
+        "--input",
+        str(input_path.resolve()),
+        "--output",
+        str(output_path.resolve()),
+    ]
+    try:
+        subprocess.run(
+            command,
+            cwd=str((project_root or Path.cwd()).resolve()),
+            check=True,
+            capture_output=True,
+            text=True,
+        )
+    except (OSError, subprocess.CalledProcessError) as exc:
+        return RenderResult(
+            output_path=None,
+            mode="mp4",
+            renderer="remotion",
+            scene_count=scene_count,
+            error=f"Remotion render failed: {exc}",
+        )
+
+    if not output_path.exists():
+        return RenderResult(
+            output_path=None,
+            mode="mp4",
+            renderer="remotion",
+            scene_count=scene_count,
+            error="Remotion render did not create demo.mp4",
+        )
+    return RenderResult(
+        output_path=output_path,
+        mode="mp4",
+        renderer="remotion",
+        scene_count=scene_count,
+        error=None,
+    )
+
+
 def _normalize_scene(scene: dict[str, Any], index: int) -> dict[str, Any]:
     narration = str(scene.get("narration") or "")
     return {
@@ -69,6 +169,11 @@ def _normalize_scene(scene: dict[str, Any], index: int) -> dict[str, Any]:
         "evidence": _string_list(scene.get("evidence"), limit=4),
         "caption_emphasis": _string_list(scene.get("caption_emphasis"), limit=5),
     }
+
+
+def _duration_seconds(scenes: list[dict[str, Any]], config: RenderConfig) -> int:
+    scene_duration = sum(float(scene.get("duration_seconds", 0)) for scene in scenes)
+    return int(scene_duration) or config.seconds_per_scene * max(len(scenes), 1)
 
 
 def _string_list(value: Any, *, limit: int) -> list[str]:

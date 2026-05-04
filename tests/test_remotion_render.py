@@ -1,3 +1,4 @@
+import subprocess
 from pathlib import Path
 
 from repo_to_shorts.remotion_render import (
@@ -6,6 +7,8 @@ from repo_to_shorts.remotion_render import (
     _headline_from_narration,
     _normalize_scene,
     build_remotion_input,
+    remotion_available,
+    render_remotion_video,
     write_remotion_input,
 )
 
@@ -194,3 +197,170 @@ def test_default_scene_type_caps_at_cta_end_card():
 
 def test_headline_from_narration_uses_fallback_for_blank_text():
     assert _headline_from_narration("") == "Repo to Shorts"
+
+
+def test_remotion_available_requires_node_npm_package_json_and_render_script(
+    monkeypatch,
+    tmp_path: Path,
+):
+    monkeypatch.setattr(
+        "repo_to_shorts.remotion_render.shutil.which",
+        lambda name: f"/usr/bin/{name}" if name in {"node", "npm"} else None,
+    )
+
+    assert remotion_available(tmp_path) is False
+
+    (tmp_path / "package.json").write_text(
+        '{"scripts":{"test":"pytest"}}',
+        encoding="utf-8",
+    )
+    assert remotion_available(tmp_path) is False
+
+    (tmp_path / "package.json").write_text(
+        '{"scripts":{"render:remotion":"node remotion/render.mjs"}}',
+        encoding="utf-8",
+    )
+    assert remotion_available(tmp_path) is True
+
+    monkeypatch.setattr("repo_to_shorts.remotion_render.shutil.which", lambda name: None)
+    assert remotion_available(tmp_path) is False
+
+
+def test_render_remotion_video_returns_unavailable_result(monkeypatch, tmp_path: Path):
+    monkeypatch.setattr(
+        "repo_to_shorts.remotion_render.remotion_available",
+        lambda project_root=None: False,
+    )
+
+    result = render_remotion_video(
+        tmp_path,
+        [{"type": "ColdOpen", "headline": "Hook", "narration": "Hook."}],
+        repo_name="repo",
+        description="Description",
+        key_files=["README.md"],
+        proof={"kimi_mode": "deterministic-fallback"},
+    )
+
+    assert result.output_path is None
+    assert result.mode == "mp4"
+    assert result.renderer == "remotion"
+    assert result.scene_count == 1
+    assert result.error is not None
+    assert result.error.startswith("Remotion unavailable:")
+
+
+def test_render_remotion_video_invokes_npm_and_returns_result(
+    monkeypatch,
+    tmp_path: Path,
+):
+    project_root = tmp_path / "project"
+    run_dir = tmp_path / "run"
+    commands = []
+
+    def fake_run(command, cwd, check, capture_output, text):
+        commands.append((command, cwd, check, capture_output, text))
+        output = Path(command[-1])
+        output.parent.mkdir(parents=True, exist_ok=True)
+        output.write_bytes(b"fake mp4")
+        return subprocess.CompletedProcess(command, 0, "", "")
+
+    monkeypatch.setattr("repo_to_shorts.remotion_render.subprocess.run", fake_run)
+    monkeypatch.setattr(
+        "repo_to_shorts.remotion_render.remotion_available",
+        lambda root=None: root == project_root,
+    )
+
+    result = render_remotion_video(
+        run_dir,
+        [
+            {"type": "ColdOpen", "headline": "Hook", "narration": "Hook.", "duration_seconds": 3},
+            {"type": "CTAEndCard", "headline": "Ship", "narration": "Ship.", "duration_seconds": 4},
+        ],
+        repo_name="repo",
+        description="Description",
+        key_files=["README.md"],
+        proof={"kimi_mode": "live-api"},
+        project_root=project_root,
+    )
+
+    assert result.output_path == run_dir / "demo.mp4"
+    assert result.mode == "mp4"
+    assert result.renderer == "remotion"
+    assert result.scene_count == 2
+    assert result.error is None
+    assert result.output_path.exists()
+    assert (run_dir / "render" / "remotion_input.json").exists()
+    command, cwd, check, capture_output, text = commands[0]
+    assert command == [
+        "npm",
+        "run",
+        "render:remotion",
+        "--",
+        "--input",
+        str((run_dir / "render" / "remotion_input.json").resolve()),
+        "--output",
+        str((run_dir / "demo.mp4").resolve()),
+    ]
+    assert cwd == str(project_root.resolve())
+    assert check is True
+    assert capture_output is True
+    assert text is True
+
+
+def test_render_remotion_video_returns_failure_for_subprocess_error(
+    monkeypatch,
+    tmp_path: Path,
+):
+    def fake_run(command, cwd, check, capture_output, text):
+        raise subprocess.CalledProcessError(1, command, stderr="boom")
+
+    monkeypatch.setattr("repo_to_shorts.remotion_render.subprocess.run", fake_run)
+    monkeypatch.setattr(
+        "repo_to_shorts.remotion_render.remotion_available",
+        lambda project_root=None: True,
+    )
+
+    result = render_remotion_video(
+        tmp_path,
+        [{"type": "ColdOpen", "headline": "Hook", "narration": "Hook."}],
+        repo_name="repo",
+        description="Description",
+        key_files=[],
+        proof={},
+    )
+
+    assert result.output_path is None
+    assert result.mode == "mp4"
+    assert result.renderer == "remotion"
+    assert result.scene_count == 1
+    assert result.error is not None
+    assert result.error.startswith("Remotion render failed:")
+
+
+def test_render_remotion_video_returns_failure_when_output_is_missing(
+    monkeypatch,
+    tmp_path: Path,
+):
+    monkeypatch.setattr(
+        "repo_to_shorts.remotion_render.subprocess.run",
+        lambda command, cwd, check, capture_output, text: subprocess.CompletedProcess(command, 0, "", ""),
+    )
+    monkeypatch.setattr(
+        "repo_to_shorts.remotion_render.remotion_available",
+        lambda project_root=None: True,
+    )
+
+    result = render_remotion_video(
+        tmp_path,
+        [{"type": "ColdOpen", "headline": "Hook", "narration": "Hook."}],
+        repo_name="repo",
+        description="Description",
+        key_files=[],
+        proof={},
+    )
+
+    assert result.output_path is None
+    assert result.mode == "mp4"
+    assert result.renderer == "remotion"
+    assert result.scene_count == 1
+    assert result.error == "Remotion render did not create demo.mp4"
