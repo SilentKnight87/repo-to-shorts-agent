@@ -1,0 +1,1676 @@
+/* ============================================================================
+ * Repo-to-Shorts — VHS Cassette redesign
+ * Warm, degraded broadcast video. Medium effect intensity.
+ * Order: fonts -> tokens -> reset/base -> components -> effects -> views
+ *        -> reduced-motion -> responsive
+ * ============================================================================ */
+
+/* ---------- 1. @font-face --------------------------------------------------- */
+@font-face {
+  font-family: "Anton";
+  font-display: swap;
+  font-weight: 400;
+  font-style: normal;
+  src: url("/static/fonts/Anton-Regular.woff2") format("woff2");
+}
+
+@font-face {
+  font-family: "JetBrains Mono";
+  font-display: swap;
+  font-weight: 100 800;
+  font-style: normal;
+  src: url("/static/fonts/JetBrainsMono-Variable.woff2") format("woff2-variations"),
+       url("/static/fonts/JetBrainsMono-Variable.woff2") format("woff2");
+}
+
+/* ---------- 2. :root tokens ------------------------------------------------- */
+:root {
+  /* surfaces */
+  --bg: #0b0707;
+  --panel: #120c0c;
+  --panel-2: #1a1010;
+
+  /* text */
+  --ink: #f0e8d8;
+  --ink-2: #c9b89a;
+  --ink-3: #8a7a64;
+  --ink-4: #5a4632;
+
+  /* tape labels */
+  --label-cream: #e8d8b6;
+  --label-ink: #3a2a14;
+
+  /* signal states */
+  --rec: #ff5e5e;
+  --live: #ff8c4a;
+  --lock: #4afa8c;
+
+  /* RGB chromatic ghost */
+  --ghost-magenta: #ff3a8e;
+  --ghost-cyan: #38d8ff;
+
+  /* SMPTE color bars (slightly desaturated) */
+  --bar-silver: #bcb6a8;
+  --bar-yellow: #c8b832;
+  --bar-cyan: #3ab2b9;
+  --bar-green: #4cb24a;
+  --bar-magenta: #bf3aa8;
+  --bar-red: #c8392a;
+  --bar-blue: #3a48b9;
+
+  /* type stacks */
+  --font-display: "Anton", "Helvetica Neue Condensed", "Arial Narrow", sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
+  --font-body: system-ui, -apple-system, "Inter", sans-serif;
+
+  /* type scale (px) */
+  --fs-9: 9px;
+  --fs-10: 10px;
+  --fs-11: 11px;
+  --fs-13: 13px;
+  --fs-16: 16px;
+  --fs-24: 24px;
+  --fs-38: 38px;
+  --fs-64: 64px;
+  --fs-96: 96px;
+
+  /* spacing scale */
+  --sp-1: 4px;
+  --sp-2: 8px;
+  --sp-3: 12px;
+  --sp-4: 16px;
+  --sp-5: 24px;
+  --sp-6: 32px;
+  --sp-7: 48px;
+  --sp-8: 64px;
+  --sp-9: 96px;
+
+  /* motion */
+  --motion-quick: 80ms;
+  --motion-base: 200ms;
+  --motion-glitch: 320ms;
+  --motion-eject: 450ms;
+
+  /* easing */
+  --ease-tape: cubic-bezier(0.2, 0.7, 0.2, 1);
+
+  /* tracking */
+  --track-wide: 0.18em;
+  --track-mid: 0.08em;
+
+  /* misc */
+  --hairline: 1px solid var(--ink-4);
+  --dashed: 1px dashed var(--ink-4);
+}
+
+/* ---------- 3. Reset + base body -------------------------------------------- */
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  padding: 0;
+  background: var(--bg);
+  color: var(--ink-2);
+  min-height: 100%;
+}
+
+html {
+  /* Body lede uses system stack; chrome overrides per-component. */
+  font-family: var(--font-body);
+  font-size: 16px;
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
+}
+
+body {
+  position: relative;
+  overflow-x: hidden;
+  /* Always-on VHS atmosphere. The effects below stack via ::before/::after. */
+}
+
+img,
+video,
+svg {
+  display: block;
+  max-width: 100%;
+}
+
+a {
+  color: var(--ink);
+  text-decoration: none;
+  border-bottom: 1px dotted var(--ink-4);
+  transition: color var(--motion-quick) var(--ease-tape),
+              border-color var(--motion-quick) var(--ease-tape);
+}
+
+a:hover {
+  color: var(--live);
+  border-bottom-color: var(--live);
+}
+
+button,
+input,
+select,
+textarea {
+  font: inherit;
+  color: inherit;
+  background: transparent;
+  border: 0;
+  margin: 0;
+}
+
+button {
+  cursor: pointer;
+}
+
+::selection {
+  background: var(--live);
+  color: var(--bg);
+}
+
+hr {
+  border: 0;
+  border-top: var(--dashed);
+  margin: var(--sp-5) 0;
+}
+
+/* Always-on body effects: scanlines + CRT vignette + noise. Static. */
+body.fx-scanlines.fx-crt.fx-noise,
+body {
+  /* fallback if classes missing, still feels broadcast-y */
+}
+
+body::before,
+body::after {
+  content: "";
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 9999;
+}
+
+/* Scanlines (static, never animated) */
+body::before {
+  background: repeating-linear-gradient(
+    to bottom,
+    rgba(0, 0, 0, 0) 0,
+    rgba(0, 0, 0, 0) 2px,
+    rgba(0, 0, 0, 0.18) 2px,
+    rgba(0, 0, 0, 0.18) 3px
+  );
+  mix-blend-mode: multiply;
+  opacity: 0.55;
+}
+
+/* CRT vignette + faint barrel-distortion tint */
+body::after {
+  background:
+    radial-gradient(
+      ellipse at center,
+      rgba(0, 0, 0, 0) 55%,
+      rgba(0, 0, 0, 0.55) 100%
+    ),
+    radial-gradient(
+      ellipse at center,
+      rgba(255, 90, 60, 0.04) 0%,
+      rgba(0, 0, 0, 0) 60%
+    );
+  box-shadow: inset 0 0 160px rgba(0, 0, 0, 0.65);
+}
+
+/* ---------- 4. Components --------------------------------------------------- */
+
+/* === IDENTITY & FRAMING ==================================================== */
+
+/* .slate — top-of-page status strip, 3 columns */
+.slate {
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
+  align-items: center;
+  gap: var(--sp-4);
+  padding: var(--sp-3) var(--sp-5);
+  border-bottom: var(--dashed);
+  font-family: var(--font-mono);
+  font-size: var(--fs-10);
+  font-weight: 600;
+  letter-spacing: var(--track-wide);
+  text-transform: uppercase;
+  color: var(--ink-3);
+  background: var(--bg);
+}
+
+.slate-state {
+  justify-self: start;
+  color: var(--ink);
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sp-2);
+}
+
+.slate-state.is-rec {
+  color: var(--rec);
+}
+
+.slate-state.is-rec::before {
+  content: "";
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--rec);
+  box-shadow: 0 0 6px var(--rec);
+  animation: rec-blink 1s steps(2) infinite;
+}
+
+.slate-state.is-live {
+  color: var(--live);
+}
+
+.slate-state.is-lock {
+  color: var(--lock);
+}
+
+.slate-title {
+  justify-self: center;
+  color: var(--ink);
+  letter-spacing: var(--track-wide);
+}
+
+.slate-tc {
+  justify-self: end;
+  color: var(--ink-2);
+  font-variant-numeric: tabular-nums;
+}
+
+@keyframes rec-blink {
+  50% {
+    opacity: 0.25;
+  }
+}
+
+/* .colorbars — SMPTE 7-stripe */
+.colorbars {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  width: 100%;
+  height: 18px;
+  background: var(--bg);
+  position: relative;
+  overflow: hidden;
+}
+
+.colorbars::before,
+.colorbars::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  height: 1px;
+  background: rgba(0, 0, 0, 0.45);
+  pointer-events: none;
+}
+
+.colorbars::before {
+  top: 0;
+}
+
+.colorbars::after {
+  bottom: 0;
+}
+
+.colorbars > * {
+  display: block;
+  height: 100%;
+  /* faint vertical scan-shimmer baked into each bar */
+  background-image: linear-gradient(
+    to bottom,
+    rgba(255, 255, 255, 0.06),
+    rgba(0, 0, 0, 0.12)
+  );
+  animation: bar-shimmer 8s linear infinite;
+}
+
+.colorbars > :nth-child(1) { background-color: var(--bar-silver); }
+.colorbars > :nth-child(2) { background-color: var(--bar-yellow); }
+.colorbars > :nth-child(3) { background-color: var(--bar-cyan); }
+.colorbars > :nth-child(4) { background-color: var(--bar-green); }
+.colorbars > :nth-child(5) { background-color: var(--bar-magenta); }
+.colorbars > :nth-child(6) { background-color: var(--bar-red); }
+.colorbars > :nth-child(7) { background-color: var(--bar-blue); }
+
+.colorbars--banner {
+  height: 12px;
+}
+
+.colorbars--inline {
+  height: 6px;
+}
+
+@keyframes bar-shimmer {
+  0%, 100% {
+    filter: hue-rotate(0deg) saturate(1);
+  }
+  50% {
+    filter: hue-rotate(-6deg) saturate(0.92);
+  }
+}
+
+/* .tape-edge — 2px stripes top + bottom of main shell */
+.tape-edge {
+  position: relative;
+}
+
+.tape-edge::before,
+.tape-edge::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  height: 2px;
+  background: repeating-linear-gradient(
+    to right,
+    var(--ink-4) 0,
+    var(--ink-4) 6px,
+    transparent 6px,
+    transparent 9px,
+    var(--ink-3) 9px,
+    var(--ink-3) 11px,
+    transparent 11px,
+    transparent 16px
+  );
+  opacity: 0.55;
+  animation: tape-dropout 8s linear infinite;
+  pointer-events: none;
+}
+
+.tape-edge::before {
+  top: 0;
+}
+
+.tape-edge::after {
+  bottom: 0;
+}
+
+@keyframes tape-dropout {
+  0%, 92%, 100% {
+    transform: translateX(0);
+    opacity: 0.55;
+  }
+  93% {
+    transform: translateX(-3px);
+    opacity: 0.2;
+  }
+  94% {
+    transform: translateX(2px);
+    opacity: 0.85;
+  }
+  95% {
+    transform: translateX(-1px);
+    opacity: 0.4;
+  }
+}
+
+/* === INPUTS & CONTROLS ===================================================== */
+
+/* .tape-input — URL field with blinking cursor prefix */
+.tape-input {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: var(--sp-3);
+  background: var(--panel-2);
+  border: var(--dashed);
+  padding: var(--sp-3) var(--sp-4) var(--sp-3) var(--sp-7);
+  font-family: var(--font-mono);
+  font-size: var(--fs-13);
+  color: var(--ink);
+  transition: border-color var(--motion-base) var(--ease-tape),
+              background var(--motion-base) var(--ease-tape);
+}
+
+.tape-input::before {
+  content: "▌";
+  position: absolute;
+  left: var(--sp-4);
+  top: 50%;
+  transform: translateY(-50%);
+  color: var(--ink-3);
+  font-family: var(--font-mono);
+  font-size: var(--fs-13);
+  animation: cursor-blink 1s steps(2) infinite;
+  pointer-events: none;
+}
+
+.tape-input:focus-within {
+  border: 1px solid var(--ink-3);
+  background: #0f0808;
+}
+
+.tape-input:focus-within::before {
+  color: var(--live);
+  text-shadow: 0 0 6px rgba(255, 140, 74, 0.4);
+}
+
+.tape-input input,
+.tape-input select,
+.tape-input textarea {
+  flex: 1;
+  width: 100%;
+  background: transparent;
+  border: 0;
+  outline: 0;
+  color: var(--ink);
+  font: inherit;
+  letter-spacing: var(--track-mid);
+}
+
+.tape-input input::placeholder {
+  color: var(--ink-4);
+  font-style: italic;
+}
+
+.tape-input label,
+.tape-input .tape-input-label {
+  font-family: var(--font-mono);
+  font-size: var(--fs-10);
+  letter-spacing: var(--track-wide);
+  text-transform: uppercase;
+  color: var(--ink-3);
+  white-space: nowrap;
+}
+
+@keyframes cursor-blink {
+  50% {
+    opacity: 0;
+  }
+}
+
+/* .btn-tape — chunky transport button */
+.btn-tape {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sp-2);
+  padding: var(--sp-3) var(--sp-5);
+  background: transparent;
+  border: 1px solid var(--ink-3);
+  color: var(--ink);
+  font-family: var(--font-mono);
+  font-size: var(--fs-11);
+  font-weight: 700;
+  letter-spacing: var(--track-wide);
+  text-transform: uppercase;
+  text-decoration: none;
+  cursor: pointer;
+  transition: transform var(--motion-quick) var(--ease-tape),
+              filter var(--motion-quick) var(--ease-tape),
+              background var(--motion-quick) var(--ease-tape),
+              border-color var(--motion-quick) var(--ease-tape),
+              color var(--motion-quick) var(--ease-tape);
+  user-select: none;
+  white-space: nowrap;
+}
+
+.btn-tape:hover {
+  filter: brightness(1.08);
+  transform: translateY(-1px);
+}
+
+.btn-tape:active {
+  transform: translateY(1px);
+  filter: brightness(0.92);
+}
+
+.btn-tape:focus-visible {
+  outline: 2px solid var(--live);
+  outline-offset: 2px;
+}
+
+.btn-tape:disabled,
+.btn-tape[aria-disabled="true"] {
+  opacity: 0.45;
+  cursor: not-allowed;
+  filter: grayscale(0.6);
+  transform: none;
+}
+
+.btn-tape--primary {
+  background: var(--ink);
+  color: var(--bg);
+  border-color: var(--ink);
+}
+
+.btn-tape--primary:hover {
+  background: var(--label-cream);
+  border-color: var(--label-cream);
+}
+
+.btn-tape--ghost {
+  background: transparent;
+  color: var(--ink-2);
+  border-color: var(--ink-4);
+  border-style: dashed;
+}
+
+.btn-tape--ghost:hover {
+  color: var(--ink);
+  border-color: var(--ink-3);
+}
+
+.btn-tape--rec {
+  background: var(--rec);
+  color: #1a0606;
+  border-color: var(--rec);
+}
+
+.btn-tape--rec:hover {
+  background: #ff7a7a;
+  border-color: #ff7a7a;
+}
+
+/* .toggle-mode — three-pill cluster, only one lit at a time */
+.toggle-mode {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sp-2);
+  padding: var(--sp-2) var(--sp-3);
+  border: var(--dashed);
+  background: var(--panel-2);
+}
+
+.toggle-mode-label {
+  font-family: var(--font-mono);
+  font-size: var(--fs-10);
+  letter-spacing: var(--track-wide);
+  text-transform: uppercase;
+  color: var(--ink-3);
+  margin-right: var(--sp-2);
+}
+
+.toggle-mode-pill {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 38px;
+  padding: var(--sp-1) var(--sp-3);
+  background: transparent;
+  border: 1px solid var(--ink-4);
+  border-radius: 2px;
+  color: var(--ink-3);
+  font-family: var(--font-mono);
+  font-size: var(--fs-10);
+  font-weight: 700;
+  letter-spacing: var(--track-wide);
+  text-transform: uppercase;
+  cursor: pointer;
+  transition: transform var(--motion-base) var(--ease-tape),
+              background var(--motion-base) var(--ease-tape),
+              color var(--motion-base) var(--ease-tape),
+              border-color var(--motion-base) var(--ease-tape);
+}
+
+.toggle-mode-pill:hover {
+  color: var(--ink);
+  border-color: var(--ink-3);
+}
+
+.toggle-mode-pill[aria-pressed="true"],
+.toggle-mode-pill.is-lit,
+.toggle-mode-pill[data-active="true"] {
+  background: var(--label-cream);
+  color: var(--label-ink);
+  border-color: var(--label-cream);
+  transform: rotate(-1.2deg);
+  box-shadow: 2px 2px 0 rgba(0, 0, 0, 0.55);
+}
+
+/* === STATUS & DATA ========================================================= */
+
+/* .status-pill — small inline state marker */
+.status-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sp-2);
+  padding: 2px var(--sp-2);
+  border-radius: 2px;
+  border: 1px solid currentColor;
+  font-family: var(--font-mono);
+  font-size: var(--fs-9);
+  font-weight: 700;
+  letter-spacing: var(--track-wide);
+  text-transform: uppercase;
+  color: var(--ink-3);
+  background: rgba(0, 0, 0, 0.35);
+  line-height: 1;
+}
+
+.status-pill::before {
+  content: "";
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: currentColor;
+  flex-shrink: 0;
+}
+
+.status-pill.is-rec {
+  color: var(--rec);
+}
+
+.status-pill.is-rec::before {
+  animation: rec-blink 1s steps(2) infinite;
+  box-shadow: 0 0 4px var(--rec);
+}
+
+.status-pill.is-live {
+  color: var(--live);
+}
+
+.status-pill.is-live::before {
+  box-shadow: 0 0 4px var(--live);
+}
+
+.status-pill.is-lock {
+  color: var(--lock);
+}
+
+.status-pill.is-lock::before {
+  box-shadow: 0 0 4px var(--lock);
+}
+
+.status-pill.is-idle {
+  color: var(--ink-4);
+}
+
+.status-pill.is-idle::before {
+  background: transparent;
+  border: 1px solid var(--ink-4);
+}
+
+/* .channel-row — [label] [bar] [status] */
+.channel-row {
+  display: grid;
+  grid-template-columns: minmax(120px, 160px) 1fr minmax(80px, 120px);
+  align-items: center;
+  gap: var(--sp-4);
+  padding: var(--sp-3) 0;
+  border-bottom: var(--dashed);
+  font-family: var(--font-mono);
+  font-size: var(--fs-11);
+  letter-spacing: var(--track-mid);
+  color: var(--ink-3);
+}
+
+.channel-row:last-child {
+  border-bottom: 0;
+}
+
+.channel-row .ch-label {
+  font-size: var(--fs-10);
+  letter-spacing: var(--track-wide);
+  text-transform: uppercase;
+  color: var(--ink-2);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.channel-row .ch-bar {
+  position: relative;
+  height: 8px;
+  background: var(--panel-2);
+  border: 1px solid var(--ink-4);
+  overflow: hidden;
+}
+
+.channel-row .ch-fill {
+  position: absolute;
+  inset: 0;
+  width: 0;
+  background: var(--ink-4);
+  transition: width var(--motion-base) var(--ease-tape),
+              background var(--motion-base) var(--ease-tape);
+  background-image: repeating-linear-gradient(
+    to right,
+    transparent 0,
+    transparent 4px,
+    rgba(0, 0, 0, 0.18) 4px,
+    rgba(0, 0, 0, 0.18) 5px
+  );
+}
+
+.channel-row .ch-status {
+  text-align: right;
+  font-size: var(--fs-10);
+  letter-spacing: var(--track-wide);
+  text-transform: uppercase;
+  color: var(--ink-3);
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+
+/* state colors driven by data-state */
+.channel-row[data-state="idle"] .ch-fill {
+  background-color: var(--ink-4);
+  width: 0;
+}
+
+.channel-row[data-state="idle"] .ch-status {
+  color: var(--ink-4);
+}
+
+.channel-row[data-state="stby"] .ch-fill {
+  background-color: var(--ink-3);
+  width: 4%;
+}
+
+.channel-row[data-state="stby"] .ch-status {
+  color: var(--ink-3);
+}
+
+.channel-row[data-state="live"] .ch-label {
+  color: var(--live);
+}
+
+.channel-row[data-state="live"] .ch-fill {
+  background-color: var(--live);
+  box-shadow: 0 0 6px rgba(255, 140, 74, 0.45);
+}
+
+.channel-row[data-state="live"] .ch-status {
+  color: var(--live);
+  animation: rec-blink 1.4s steps(2) infinite;
+}
+
+.channel-row[data-state="done"] .ch-label {
+  color: var(--lock);
+}
+
+.channel-row[data-state="done"] .ch-fill {
+  background-color: var(--lock);
+  width: 100%;
+  box-shadow: 0 0 5px rgba(74, 250, 140, 0.3);
+}
+
+.channel-row[data-state="done"] .ch-status {
+  color: var(--lock);
+}
+
+.channel-row[data-state="error"] .ch-label {
+  color: var(--rec);
+}
+
+.channel-row[data-state="error"] .ch-fill {
+  background-color: var(--rec);
+  width: 100%;
+  background-image: repeating-linear-gradient(
+    45deg,
+    transparent 0,
+    transparent 4px,
+    rgba(0, 0, 0, 0.35) 4px,
+    rgba(0, 0, 0, 0.35) 8px
+  );
+}
+
+.channel-row[data-state="error"] .ch-status {
+  color: var(--rec);
+  animation: rec-blink 0.7s steps(2) infinite;
+}
+
+/* .vu-meter — 20-segment LED bar */
+.vu-meter {
+  display: grid;
+  grid-template-columns: repeat(20, 1fr);
+  gap: 2px;
+  padding: var(--sp-2) var(--sp-3);
+  background: var(--panel-2);
+  border: 1px solid var(--ink-4);
+  height: 22px;
+}
+
+.vu-meter span,
+.vu-meter > * {
+  display: block;
+  height: 100%;
+  background: var(--ink-4);
+  opacity: 0.35;
+  transition: opacity var(--motion-quick) linear;
+}
+
+.vu-meter span:nth-child(-n+12) { background: var(--lock); }
+.vu-meter span:nth-child(n+13):nth-child(-n+17) { background: var(--live); }
+.vu-meter span:nth-child(n+18) { background: var(--rec); }
+
+/* keyframe-driven sweep so it animates without JS */
+.vu-meter span:nth-child(1)  { animation: vu-pulse 1.6s ease-in-out infinite; animation-delay: -0.00s; }
+.vu-meter span:nth-child(2)  { animation: vu-pulse 1.6s ease-in-out infinite; animation-delay: -0.05s; }
+.vu-meter span:nth-child(3)  { animation: vu-pulse 1.6s ease-in-out infinite; animation-delay: -0.10s; }
+.vu-meter span:nth-child(4)  { animation: vu-pulse 1.6s ease-in-out infinite; animation-delay: -0.15s; }
+.vu-meter span:nth-child(5)  { animation: vu-pulse 1.6s ease-in-out infinite; animation-delay: -0.20s; }
+.vu-meter span:nth-child(6)  { animation: vu-pulse 1.6s ease-in-out infinite; animation-delay: -0.25s; }
+.vu-meter span:nth-child(7)  { animation: vu-pulse 1.6s ease-in-out infinite; animation-delay: -0.30s; }
+.vu-meter span:nth-child(8)  { animation: vu-pulse 1.6s ease-in-out infinite; animation-delay: -0.35s; }
+.vu-meter span:nth-child(9)  { animation: vu-pulse 1.6s ease-in-out infinite; animation-delay: -0.40s; }
+.vu-meter span:nth-child(10) { animation: vu-pulse 1.6s ease-in-out infinite; animation-delay: -0.45s; }
+.vu-meter span:nth-child(11) { animation: vu-pulse 1.6s ease-in-out infinite; animation-delay: -0.50s; }
+.vu-meter span:nth-child(12) { animation: vu-pulse 1.6s ease-in-out infinite; animation-delay: -0.55s; }
+.vu-meter span:nth-child(13) { animation: vu-pulse 1.8s ease-in-out infinite; animation-delay: -0.60s; }
+.vu-meter span:nth-child(14) { animation: vu-pulse 1.8s ease-in-out infinite; animation-delay: -0.65s; }
+.vu-meter span:nth-child(15) { animation: vu-pulse 1.8s ease-in-out infinite; animation-delay: -0.70s; }
+.vu-meter span:nth-child(16) { animation: vu-pulse 1.8s ease-in-out infinite; animation-delay: -0.75s; }
+.vu-meter span:nth-child(17) { animation: vu-pulse 1.8s ease-in-out infinite; animation-delay: -0.80s; }
+.vu-meter span:nth-child(18) { animation: vu-pulse 2.2s ease-in-out infinite; animation-delay: -0.90s; }
+.vu-meter span:nth-child(19) { animation: vu-pulse 2.2s ease-in-out infinite; animation-delay: -1.00s; }
+.vu-meter span:nth-child(20) { animation: vu-pulse 2.2s ease-in-out infinite; animation-delay: -1.10s; }
+
+@keyframes vu-pulse {
+  0%, 100% { opacity: 0.35; }
+  40%      { opacity: 1; }
+  60%      { opacity: 0.85; }
+}
+
+/* .scope-strip — bottom diagnostic readout */
+.scope-strip {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--sp-4);
+  padding: var(--sp-3) var(--sp-5);
+  border-top: var(--dashed);
+  font-family: var(--font-mono);
+  font-size: var(--fs-9);
+  letter-spacing: var(--track-wide);
+  text-transform: uppercase;
+  color: var(--ink-4);
+  background: var(--bg);
+  font-variant-numeric: tabular-nums;
+}
+
+.scope-strip > span {
+  white-space: nowrap;
+}
+
+.scope-strip > span + span::before {
+  content: "·";
+  margin-right: var(--sp-4);
+  color: var(--ink-4);
+  opacity: 0.6;
+}
+
+/* === CONTAINERS & VIEWPORTS ================================================ */
+
+/* .deck — primary panel container */
+.deck {
+  position: relative;
+  background: var(--panel);
+  border: 1px solid var(--ink-4);
+  padding: var(--sp-5);
+  /* internal CRT vignette */
+  box-shadow: inset 0 0 80px rgba(0, 0, 0, 0.55);
+}
+
+.deck-title,
+.deck > .deck-title {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--sp-4);
+  font-family: var(--font-mono);
+  font-size: var(--fs-10);
+  font-weight: 700;
+  letter-spacing: var(--track-wide);
+  text-transform: uppercase;
+  color: var(--ink-3);
+  padding-bottom: var(--sp-3);
+  margin-bottom: var(--sp-4);
+  border-bottom: var(--dashed);
+}
+
+/* .crt-viewport — video/preview frame, 9:16 */
+.crt-viewport {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 9 / 16;
+  background: #050303;
+  border: 2px solid var(--ink-4);
+  overflow: hidden;
+}
+
+.crt-viewport::before {
+  /* screen curvature highlight */
+  content: "";
+  position: absolute;
+  inset: 0;
+  background:
+    radial-gradient(
+      ellipse at 50% 35%,
+      rgba(255, 255, 255, 0.05) 0%,
+      rgba(0, 0, 0, 0) 55%
+    ),
+    radial-gradient(
+      ellipse at center,
+      rgba(0, 0, 0, 0) 60%,
+      rgba(0, 0, 0, 0.6) 100%
+    );
+  pointer-events: none;
+  z-index: 2;
+}
+
+.crt-viewport::after {
+  /* faint scanlines inside the viewport */
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: repeating-linear-gradient(
+    to bottom,
+    rgba(0, 0, 0, 0) 0,
+    rgba(0, 0, 0, 0) 2px,
+    rgba(0, 0, 0, 0.22) 2px,
+    rgba(0, 0, 0, 0.22) 3px
+  );
+  mix-blend-mode: multiply;
+  opacity: 0.6;
+  pointer-events: none;
+  z-index: 3;
+}
+
+.crt-viewport > video,
+.crt-viewport > img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.crt-viewport[data-state="idle"]::before {
+  background:
+    radial-gradient(
+      ellipse at 50% 35%,
+      rgba(255, 94, 94, 0.08) 0%,
+      rgba(0, 0, 0, 0) 55%
+    ),
+    radial-gradient(
+      ellipse at center,
+      rgba(0, 0, 0, 0) 60%,
+      rgba(0, 0, 0, 0.6) 100%
+    );
+}
+
+.crt-viewport-overlay {
+  position: absolute;
+  top: var(--sp-3);
+  left: var(--sp-3);
+  z-index: 4;
+  font-family: var(--font-mono);
+  font-size: var(--fs-10);
+  font-weight: 700;
+  letter-spacing: var(--track-wide);
+  text-transform: uppercase;
+  color: var(--rec);
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sp-2);
+  padding: 4px var(--sp-2);
+  background: rgba(0, 0, 0, 0.55);
+  border: 1px solid currentColor;
+}
+
+.crt-viewport-overlay::before {
+  content: "";
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: currentColor;
+  animation: rec-blink 1s steps(2) infinite;
+}
+
+/* .tape-label — Brother P-touch sticker */
+.tape-label {
+  display: inline-block;
+  padding: var(--sp-2) var(--sp-4);
+  background: var(--label-cream);
+  color: var(--label-ink);
+  font-family: var(--font-mono);
+  font-size: var(--fs-11);
+  font-weight: 700;
+  letter-spacing: var(--track-mid);
+  text-transform: uppercase;
+  transform: rotate(-1.2deg);
+  box-shadow: 2px 2px 0 #000;
+  border-radius: 0;
+  /* faint paper grain */
+  background-image:
+    repeating-linear-gradient(
+      to right,
+      rgba(0, 0, 0, 0) 0,
+      rgba(0, 0, 0, 0) 28px,
+      rgba(0, 0, 0, 0.04) 28px,
+      rgba(0, 0, 0, 0.04) 29px
+    ),
+    linear-gradient(
+      to bottom,
+      var(--label-cream),
+      #ddc99a
+    );
+  text-decoration: none;
+  border: 0;
+  white-space: nowrap;
+  position: relative;
+}
+
+a.tape-label:hover {
+  color: var(--label-ink);
+  filter: brightness(1.05);
+  border: 0;
+}
+
+.tape-label--lg {
+  font-size: var(--fs-13);
+  padding: var(--sp-3) var(--sp-5);
+}
+
+/* === DISPLAY =============================================================== */
+
+/* .glitch-headline — big VHS hero text */
+.glitch-headline {
+  font-family: var(--font-display);
+  font-weight: 400;
+  font-size: var(--fs-96);
+  line-height: 0.92;
+  letter-spacing: -0.01em;
+  text-transform: uppercase;
+  color: var(--ink);
+  margin: 0 0 var(--sp-4);
+  /* always-on RGB chromatic ghost (per spec: ghost-magenta -2.4px, ghost-cyan +2.4px) */
+  text-shadow:
+    -2.4px 0 0 var(--ghost-magenta),
+    2.4px 0 0 var(--ghost-cyan);
+  position: relative;
+  /* keep the ghost crisp; render on its own layer */
+  will-change: transform, text-shadow;
+}
+
+/* tracking-error keyframe ONLY on [data-glitch] */
+.glitch-headline[data-glitch] {
+  animation: tracking-error var(--motion-glitch) steps(6, end);
+}
+
+.glitch-headline--md {
+  font-size: var(--fs-64);
+}
+
+.glitch-headline--sm {
+  font-size: var(--fs-38);
+}
+
+/* .kicker — small uppercase preamble */
+.kicker {
+  display: block;
+  font-family: var(--font-mono);
+  font-size: var(--fs-11);
+  font-weight: 600;
+  letter-spacing: var(--track-wide);
+  text-transform: uppercase;
+  color: var(--ink-3);
+  margin: 0 0 var(--sp-3);
+}
+
+.kicker::before {
+  content: "// ";
+  color: var(--ink-4);
+}
+
+/* ---------- 5. Effect utilities --------------------------------------------- */
+
+/* .fx-scanlines — applied to body via ::before (above). Element-level fallback: */
+.fx-scanlines {
+  position: relative;
+}
+
+.fx-scanlines:not(body)::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: repeating-linear-gradient(
+    to bottom,
+    rgba(0, 0, 0, 0) 0,
+    rgba(0, 0, 0, 0) 2px,
+    rgba(0, 0, 0, 0.18) 2px,
+    rgba(0, 0, 0, 0.18) 3px
+  );
+  mix-blend-mode: multiply;
+  opacity: 0.55;
+  z-index: 1;
+}
+
+/* .fx-crt — vignette + barely-perceptible barrel filter */
+.fx-crt {
+  position: relative;
+}
+
+.fx-crt:not(body) {
+  /* on element-level use, add inset vignette directly */
+  box-shadow: inset 0 0 80px rgba(0, 0, 0, 0.55);
+}
+
+/* .fx-rgb-ghost — chromatic split (use as a class on text elements) */
+.fx-rgb-ghost {
+  text-shadow:
+    -2.4px 0 0 var(--ghost-magenta),
+    2.4px 0 0 var(--ghost-cyan);
+}
+
+/* .fx-tracking-error — fires once when applied / on [data-glitch] */
+.fx-tracking-error {
+  animation: tracking-error var(--motion-glitch) steps(6, end);
+}
+
+@keyframes tracking-error {
+  0% {
+    transform: translate(0, 0) skewX(0);
+    text-shadow:
+      -2.4px 0 0 var(--ghost-magenta),
+      2.4px 0 0 var(--ghost-cyan);
+    clip-path: inset(0 0 0 0);
+  }
+  18% {
+    transform: translate(2px, -3px) skewX(-3deg);
+    text-shadow:
+      -6px 0 0 var(--ghost-magenta),
+      6px 0 0 var(--ghost-cyan),
+      0 -1px 0 rgba(255, 255, 255, 0.2);
+    clip-path: inset(20% 0 50% 0);
+  }
+  34% {
+    transform: translate(-3px, 2px) skewX(2deg);
+    text-shadow:
+      -3px 1px 0 var(--ghost-magenta),
+      4px -1px 0 var(--ghost-cyan);
+    clip-path: inset(40% 0 10% 0);
+  }
+  52% {
+    transform: translate(1px, 3px) skewX(-1deg);
+    text-shadow:
+      -8px 0 0 var(--ghost-magenta),
+      8px 0 0 var(--ghost-cyan);
+    clip-path: inset(0 0 60% 0);
+  }
+  72% {
+    transform: translate(-1px, -1px) skewX(0);
+    text-shadow:
+      -2.4px 0 0 var(--ghost-magenta),
+      2.4px 0 0 var(--ghost-cyan);
+    clip-path: inset(0 0 0 0);
+  }
+  100% {
+    transform: translate(0, 0) skewX(0);
+    text-shadow:
+      -2.4px 0 0 var(--ghost-magenta),
+      2.4px 0 0 var(--ghost-cyan);
+    clip-path: inset(0 0 0 0);
+  }
+}
+
+/* .fx-tape-edge — utility wrapper */
+.fx-tape-edge {
+  position: relative;
+}
+
+.fx-tape-edge::before,
+.fx-tape-edge::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  height: 2px;
+  background: repeating-linear-gradient(
+    to right,
+    var(--ink-4) 0,
+    var(--ink-4) 6px,
+    transparent 6px,
+    transparent 9px,
+    var(--ink-3) 9px,
+    var(--ink-3) 11px,
+    transparent 11px,
+    transparent 16px
+  );
+  opacity: 0.55;
+  animation: tape-dropout 8s linear infinite;
+  pointer-events: none;
+}
+
+.fx-tape-edge::before { top: 0; }
+.fx-tape-edge::after { bottom: 0; }
+
+/* one-shot dropout flash (JS adds .fx-dropout for ~280ms) */
+.fx-dropout {
+  animation: dropout-flash 280ms steps(3, end);
+}
+
+@keyframes dropout-flash {
+  0%   { filter: none; opacity: 1; }
+  20%  { filter: brightness(2.4) contrast(1.6) saturate(0); opacity: 0.6; }
+  45%  { filter: invert(0.85) hue-rotate(-30deg); opacity: 0.85; }
+  70%  { filter: brightness(0.4) contrast(2); opacity: 0.4; }
+  100% { filter: none; opacity: 1; }
+}
+
+/* .fx-noise — inline data-uri SVG noise pattern */
+.fx-noise {
+  position: relative;
+}
+
+/* Optional explicit overlay layer — drop a <div class="fx-noise-layer"> right
+   after <body> if the body background-image attachment isn't enough on its own. */
+.fx-noise-layer {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 9998;
+  opacity: 0.07;
+  mix-blend-mode: overlay;
+  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='220' height='220' viewBox='0 0 220 220'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.92' numOctaves='2' stitchTiles='stitch' seed='7'/><feColorMatrix values='0 0 0 0 0.92  0 0 0 0 0.86  0 0 0 0 0.74  0 0 0 0.85 0'/></filter><rect width='100%25' height='100%25' filter='url(%23n)'/></svg>");
+  background-size: 220px 220px;
+}
+
+/* When body has .fx-noise, paint the noise via a body::before-stacked layer
+   using a background-image on body itself (in addition to scanlines/vignette). */
+body.fx-noise {
+  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='220' height='220' viewBox='0 0 220 220'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.92' numOctaves='2' stitchTiles='stitch' seed='7'/><feColorMatrix values='0 0 0 0 0.92  0 0 0 0 0.86  0 0 0 0 0.74  0 0 0 0.07 0'/></filter><rect width='100%25' height='100%25' filter='url(%23n)'/></svg>");
+  background-repeat: repeat;
+  background-size: 220px 220px;
+  background-attachment: fixed;
+  background-color: var(--bg);
+}
+
+/* ---------- 6. View-specific helpers (minimal) ------------------------------ */
+
+/* .shell — main wrapper (replaces old container). Inset CRT vignette per spec. */
+.shell {
+  position: relative;
+  max-width: 1280px;
+  margin: 0 auto;
+  padding: var(--sp-5) var(--sp-6) var(--sp-6);
+  min-height: 100vh;
+  box-shadow: inset 0 0 80px rgba(0, 0, 0, 0.55);
+}
+
+.shell > main,
+main.shell-main {
+  display: block;
+  padding-top: var(--sp-5);
+}
+
+/* HOME hero block */
+.hero {
+  padding: var(--sp-7) 0 var(--sp-6);
+}
+
+.hero .lede {
+  font-family: var(--font-mono);
+  font-size: var(--fs-13);
+  color: var(--ink-2);
+  max-width: 56ch;
+  margin: var(--sp-3) 0 0;
+  line-height: 1.55;
+}
+
+/* HOME deck-control: form layout inside the deck */
+.deck-control {
+  display: grid;
+  gap: var(--sp-4);
+}
+
+.deck-control .input-row {
+  display: grid;
+  gap: var(--sp-2);
+}
+
+.deck-control .toggle-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--sp-4);
+  align-items: center;
+  padding: var(--sp-3) 0;
+  border-top: var(--dashed);
+  border-bottom: var(--dashed);
+}
+
+.deck-control .button-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--sp-3);
+  align-items: center;
+}
+
+.deck-control .channel-readout {
+  margin-top: var(--sp-3);
+  padding-top: var(--sp-3);
+  border-top: var(--dashed);
+}
+
+/* TAPE ARCHIVE — list of past runs */
+.tape-archive {
+  margin-top: var(--sp-7);
+}
+
+.tape-archive-title {
+  font-family: var(--font-mono);
+  font-size: var(--fs-11);
+  letter-spacing: var(--track-wide);
+  text-transform: uppercase;
+  color: var(--ink-3);
+  margin: 0 0 var(--sp-4);
+}
+
+.tape-archive-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: var(--sp-3);
+}
+
+.tape-archive-row {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  gap: var(--sp-4);
+  align-items: center;
+  padding: var(--sp-3) 0;
+  border-bottom: var(--dashed);
+  font-family: var(--font-mono);
+  font-size: var(--fs-11);
+  color: var(--ink-2);
+}
+
+.tape-archive-row .reel-id {
+  font-weight: 700;
+  letter-spacing: var(--track-wide);
+  text-transform: uppercase;
+  color: var(--ink);
+}
+
+.tape-archive-row .reel-meta {
+  color: var(--ink-3);
+  font-size: var(--fs-10);
+  letter-spacing: var(--track-mid);
+}
+
+/* SUCCESS view: master viewer (60/40 split) */
+.master-viewer {
+  display: grid;
+  grid-template-columns: minmax(0, 6fr) minmax(0, 4fr);
+  gap: var(--sp-5);
+  margin-top: var(--sp-5);
+}
+
+.master-viewer .viewer-meta {
+  font-family: var(--font-mono);
+  font-size: var(--fs-10);
+  letter-spacing: var(--track-mid);
+  text-transform: uppercase;
+  color: var(--ink-3);
+  display: grid;
+  gap: 4px;
+  margin-top: var(--sp-3);
+}
+
+.master-viewer .viewer-actions {
+  display: flex;
+  gap: var(--sp-3);
+  margin-top: var(--sp-4);
+  flex-wrap: wrap;
+}
+
+/* SUCCESS view: cue sheet (scenes) */
+.cue-sheet {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.cue-sheet-row {
+  display: grid;
+  grid-template-columns: 36px 1fr;
+  gap: var(--sp-3);
+  padding: var(--sp-3) 0;
+  border-bottom: var(--dashed);
+  align-items: baseline;
+  font-family: var(--font-mono);
+  font-size: var(--fs-11);
+  color: var(--ink-2);
+}
+
+.cue-sheet-row .cue-num {
+  color: var(--ink-3);
+  font-weight: 700;
+  letter-spacing: var(--track-wide);
+}
+
+.cue-sheet-row .cue-title {
+  color: var(--ink);
+  font-weight: 700;
+  letter-spacing: var(--track-wide);
+  text-transform: uppercase;
+  display: block;
+}
+
+.cue-sheet-row .cue-line {
+  color: var(--ink-2);
+  margin-top: 4px;
+  display: block;
+}
+
+/* SUCCESS view: artifact tiles */
+.artifact-tiles {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--sp-4) var(--sp-5);
+  padding: var(--sp-5) 0;
+}
+
+.artifact-tiles > .tape-label:nth-child(2n) {
+  transform: rotate(0.8deg);
+}
+
+.artifact-tiles > .tape-label:nth-child(3n) {
+  transform: rotate(-0.6deg);
+}
+
+/* ERROR view: error log card */
+.error-log {
+  border: 1px solid var(--ink-4);
+  border-left: 3px solid var(--rec);
+  background: var(--panel-2);
+  padding: var(--sp-4) var(--sp-5);
+  font-family: var(--font-mono);
+  font-size: var(--fs-13);
+  color: var(--ink);
+  white-space: pre-wrap;
+  word-break: break-word;
+  margin: var(--sp-5) 0;
+}
+
+.error-log::before {
+  content: "! ";
+  color: var(--rec);
+  font-weight: 700;
+}
+
+/* ---------- 7. prefers-reduced-motion --------------------------------------- */
+@media (prefers-reduced-motion: reduce) {
+  /* disable scanline pseudo (functional content remains untouched) */
+  body::before {
+    background: none;
+  }
+
+  /* disable color-bar shimmer */
+  .colorbars > * {
+    animation: none !important;
+    background-image: linear-gradient(
+      to bottom,
+      rgba(255, 255, 255, 0.04),
+      rgba(0, 0, 0, 0.10)
+    );
+  }
+
+  /* disable tape-edge dropout */
+  .tape-edge::before,
+  .tape-edge::after,
+  .fx-tape-edge::before,
+  .fx-tape-edge::after {
+    animation: none !important;
+  }
+
+  /* disable glitch animations */
+  .glitch-headline,
+  .glitch-headline[data-glitch],
+  .fx-tracking-error {
+    animation: none !important;
+  }
+
+  /* keep RGB ghost subtler */
+  .glitch-headline,
+  .fx-rgb-ghost {
+    text-shadow:
+      -1.2px 0 0 var(--ghost-magenta),
+      1.2px 0 0 var(--ghost-cyan);
+  }
+
+  /* dropout flash off */
+  .fx-dropout {
+    animation: none !important;
+  }
+
+  /* VU meter still useful, but slow it way down */
+  .vu-meter span,
+  .vu-meter > * {
+    animation: none !important;
+    opacity: 0.7 !important;
+  }
+
+  /* cursor blink off (functional inputs still work) */
+  .tape-input::before,
+  .status-pill.is-rec::before,
+  .crt-viewport-overlay::before,
+  .slate-state.is-rec::before {
+    animation: none !important;
+  }
+
+  /* keep functional progress fills + state changes */
+  .channel-row .ch-fill {
+    transition: width var(--motion-base) linear;
+  }
+
+  /* generic guard: kill any remaining decorative animations */
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: var(--motion-base) !important;
+    scroll-behavior: auto !important;
+  }
+
+  /* but keep functional fills tickable */
+  .channel-row .ch-fill {
+    animation: none !important;
+  }
+}
+
+/* ---------- 8. Responsive: max-width 900px ---------------------------------- */
+@media (max-width: 900px) {
+  .shell {
+    padding: var(--sp-4) var(--sp-4) var(--sp-5);
+  }
+
+  .slate {
+    grid-template-columns: 1fr;
+    gap: var(--sp-2);
+    padding: var(--sp-3) var(--sp-4);
+    text-align: center;
+  }
+
+  .slate-state,
+  .slate-title,
+  .slate-tc {
+    justify-self: center;
+  }
+
+  .glitch-headline {
+    font-size: 56px;
+    text-shadow:
+      -1.6px 0 0 var(--ghost-magenta),
+      1.6px 0 0 var(--ghost-cyan);
+  }
+
+  .glitch-headline--md {
+    font-size: 44px;
+  }
+
+  .glitch-headline--sm {
+    font-size: 30px;
+  }
+
+  .hero {
+    padding: var(--sp-5) 0 var(--sp-4);
+  }
+
+  .deck {
+    padding: var(--sp-4);
+  }
+
+  .channel-row {
+    grid-template-columns: 1fr 1fr;
+    grid-template-areas:
+      "label status"
+      "bar bar";
+    gap: var(--sp-2);
+  }
+
+  .channel-row .ch-label { grid-area: label; }
+  .channel-row .ch-status { grid-area: status; }
+  .channel-row .ch-bar { grid-area: bar; }
+
+  .deck-control .toggle-row {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .deck-control .button-row {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .deck-control .button-row .btn-tape {
+    width: 100%;
+    justify-content: center;
+  }
+
+  .master-viewer {
+    grid-template-columns: 1fr;
+  }
+
+  .tape-archive-row {
+    grid-template-columns: 1fr;
+    gap: var(--sp-2);
+  }
+
+  .scope-strip {
+    font-size: 8px;
+    gap: var(--sp-2);
+  }
+
+  .scope-strip > span + span::before {
+    margin-right: var(--sp-2);
+  }
+
+  .toggle-mode {
+    flex-wrap: wrap;
+  }
+}
