@@ -12,6 +12,8 @@ from repo_to_shorts.ingest import ingest_target
 from repo_to_shorts.manim_render import generate_manim_script, render_scene
 from repo_to_shorts.media_validation import validate_media
 from repo_to_shorts.progress import ProgressTracker
+from repo_to_shorts.remotion_render import render_remotion_video
+from repo_to_shorts.render import RenderConfig, RenderResult
 from repo_to_shorts.submissions import write_submission_pack
 
 SAFE_FILE_PREFIXES = (
@@ -95,18 +97,49 @@ def run_creative_pipeline(
         run_dir = Path(out_dir) / f"{timestamp}-{_slug(snapshot.name)}"
         run_dir.mkdir(parents=True, exist_ok=True)
 
+        kimi_metadata = _build_kimi_metadata(brief, kimi_model)
+
         _start("render_frames", f"Rendering {len(brief.scenes)} scenes")
-        script = generate_manim_script(
-            {"scenes": brief.scenes, "fps": 12 if preview else 30},
-            repo_analysis,
-            run_dir,
-            style=brief.style,
-        )
         raw_video = run_dir / "video_raw.mp4"
-        video_path = render_scene(script, run_dir)
-        if video_path.exists() and video_path != raw_video:
-            video_path.rename(raw_video)
-            video_path = raw_video
+        remotion_result: RenderResult | None = None
+        render_metadata = {
+            "mode": "mp4",
+            "renderer": "pillow+ffmpeg-enhanced",
+            "output": "demo.mp4",
+            "scene_count": len(brief.scenes),
+        }
+        if final:
+            remotion_result = render_remotion_video(
+                run_dir,
+                brief.scenes,
+                repo_name=repo_analysis["repo_name"],
+                description=repo_analysis["description"],
+                key_files=repo_analysis["key_files"],
+                proof=_build_remotion_proof(kimi_metadata),
+                config=RenderConfig(output_name=raw_video.name),
+            )
+
+        if _remotion_succeeded(remotion_result):
+            video_path = remotion_result.output_path
+            render_metadata["renderer"] = "remotion"
+            render_metadata["input"] = "render/remotion_input.json"
+            render_metadata["scene_count"] = remotion_result.scene_count
+        else:
+            script = generate_manim_script(
+                {"scenes": brief.scenes, "fps": 12 if preview else 30},
+                repo_analysis,
+                run_dir,
+                style=brief.style,
+            )
+            video_path = render_scene(script, run_dir)
+            if video_path.exists() and video_path != raw_video:
+                video_path.rename(raw_video)
+                video_path = raw_video
+            if final and remotion_result is not None:
+                render_metadata["fallback_renderer"] = remotion_result.renderer
+                render_metadata["fallback_reason"] = remotion_result.error or "unknown Remotion failure"
+                if (run_dir / "render" / "remotion_input.json").exists():
+                    render_metadata["input"] = "render/remotion_input.json"
         _complete("render_frames", f"Rendered {len(brief.scenes)} scenes")
 
         captions_path = _write_captions_srt(brief.scenes, run_dir / "captions.srt")
@@ -141,15 +174,6 @@ def run_creative_pipeline(
             raise RuntimeError("; ".join(errors))
 
         _start("finalize", "Writing metadata")
-        kimi_metadata = {
-            "mode": _brief_text_attr(brief, "mode", "deterministic-fallback"),
-            "model": _brief_text_attr(brief, "model", kimi_model or "moonshotai/kimi-k2.6"),
-            "provider": _brief_text_attr(brief, "provider", "openrouter"),
-        }
-        fallback_reason = getattr(brief, "fallback_reason", None)
-        if isinstance(fallback_reason, str) and fallback_reason:
-            kimi_metadata["fallback_reason"] = fallback_reason
-
         metadata = {
             "target": target,
             "source_type": snapshot.source_type,
@@ -173,10 +197,7 @@ def run_creative_pipeline(
                 "skipped": skip_audio,
             },
             "render": {
-                "mode": "mp4",
-                "renderer": "pillow+ffmpeg-enhanced",
-                "output": "demo.mp4",
-                "scene_count": len(brief.scenes),
+                **render_metadata,
                 "preview": preview,
                 "audio": _render_audio_label(
                     skip_audio=skip_audio,
@@ -223,6 +244,30 @@ def _brief_text_attr(brief, name: str, default: str) -> str:
     if isinstance(value, str) and value:
         return value
     return default
+
+
+def _build_kimi_metadata(brief, kimi_model: str | None) -> dict[str, str]:
+    metadata = {
+        "mode": _brief_text_attr(brief, "mode", "deterministic-fallback"),
+        "model": _brief_text_attr(brief, "model", kimi_model or "moonshotai/kimi-k2.6"),
+        "provider": _brief_text_attr(brief, "provider", "openrouter"),
+    }
+    fallback_reason = getattr(brief, "fallback_reason", None)
+    if isinstance(fallback_reason, str) and fallback_reason:
+        metadata["fallback_reason"] = fallback_reason
+    return metadata
+
+
+def _build_remotion_proof(kimi_metadata: dict[str, str]) -> dict[str, str]:
+    return {
+        "kimi_mode": kimi_metadata["mode"],
+        "kimi_provider": kimi_metadata["provider"],
+        "kimi_model": kimi_metadata["model"],
+    }
+
+
+def _remotion_succeeded(result: RenderResult | None) -> bool:
+    return result is not None and result.output_path is not None and result.error is None
 
 
 def _validate_final_brief(brief) -> None:
