@@ -96,6 +96,28 @@ def test_build_remotion_input_limits_key_files_and_uses_default_artifacts():
     assert data["artifacts"] == DEFAULT_ARTIFACTS
 
 
+def test_build_remotion_input_copies_default_artifacts_and_preserves_empty_list():
+    defaulted = build_remotion_input(
+        repo_name="repo",
+        description="description",
+        key_files=[],
+        scenes=[],
+        proof={},
+    )
+    explicit_empty = build_remotion_input(
+        repo_name="repo",
+        description="description",
+        key_files=[],
+        scenes=[],
+        proof={},
+        artifacts=[],
+    )
+
+    assert defaulted["artifacts"] == DEFAULT_ARTIFACTS
+    assert defaulted["artifacts"] is not DEFAULT_ARTIFACTS
+    assert explicit_empty["artifacts"] == []
+
+
 def test_normalize_scene_preserves_values_and_limits_lists():
     scene = _normalize_scene(
         {
@@ -131,6 +153,30 @@ def test_normalize_scene_defaults_type_and_headline_from_narration():
     assert scene["type"] == "PipelineMap"
     assert scene["duration_seconds"] == 2.0
     assert scene["headline"] == "The pipeline turns repositories into video packages"
+
+
+def test_normalize_scene_accepts_scalar_tuple_and_none_lists():
+    scalar_scene = _normalize_scene(
+        {
+            "narration": "Scalar proof.",
+            "evidence": "metadata.json",
+            "caption_emphasis": ("live", "proof"),
+        },
+        0,
+    )
+    none_scene = _normalize_scene(
+        {
+            "narration": "No proof list.",
+            "evidence": None,
+            "caption_emphasis": None,
+        },
+        1,
+    )
+
+    assert scalar_scene["evidence"] == ["metadata.json"]
+    assert scalar_scene["caption_emphasis"] == ["live", "proof"]
+    assert none_scene["evidence"] == []
+    assert none_scene["caption_emphasis"] == []
 
 
 def test_default_scene_type_caps_at_cta_end_card():

@@ -43,7 +43,7 @@ def build_remotion_input(
         },
         "proof": proof,
         "scenes": [_normalize_scene(scene, index) for index, scene in enumerate(scenes)],
-        "artifacts": artifacts or DEFAULT_ARTIFACTS,
+        "artifacts": list(DEFAULT_ARTIFACTS) if artifacts is None else list(artifacts),
     }
 
 
@@ -66,11 +66,19 @@ def _normalize_scene(scene: dict[str, Any], index: int) -> dict[str, Any]:
             or _headline_from_narration(narration)
         ),
         "narration": narration,
-        "evidence": [str(item) for item in scene.get("evidence", [])][:4],
-        "caption_emphasis": [
-            str(item) for item in scene.get("caption_emphasis", [])
-        ][:5],
+        "evidence": _string_list(scene.get("evidence"), limit=4),
+        "caption_emphasis": _string_list(scene.get("caption_emphasis"), limit=5),
     }
+
+
+def _string_list(value: Any, *, limit: int) -> list[str]:
+    if value is None:
+        return []
+    if isinstance(value, str):
+        return [value][:limit]
+    if isinstance(value, list | tuple):
+        return [str(item) for item in value][:limit]
+    return [str(value)][:limit]
 
 
 def _default_scene_type(index: int) -> str:
