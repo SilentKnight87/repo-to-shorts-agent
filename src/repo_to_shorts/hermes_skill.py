@@ -87,6 +87,8 @@ def run_creative_pipeline(
         if preview:
             brief.scenes = _preview_scenes(brief.scenes)
             brief.total_duration = int(sum(float(scene.get("duration_seconds", 4)) for scene in brief.scenes))
+        if final:
+            _validate_final_brief(brief)
         _complete("kimi_brief", f"Brief: {brief.title}")
 
         timestamp = datetime.now().strftime("%Y%m%d-%H%M%S")
@@ -111,10 +113,11 @@ def run_creative_pipeline(
 
         _start("tts", "Generating narration")
         final_video = run_dir / "demo.mp4"
+        actual_tts_provider = None
         if skip_audio:
             _copy_video(video_path, final_video)
         else:
-            _merge_creative_video(
+            merge_result = _merge_creative_video(
                 video_path,
                 brief.scenes,
                 final_video,
@@ -124,6 +127,9 @@ def run_creative_pipeline(
                 voice=voice,
                 generated_music=generated_music,
             )
+            if isinstance(merge_result, dict):
+                actual_tts_provider = merge_result.get("actual_tts_provider")
+                final_video = Path(merge_result.get("output", final_video))
         _complete("tts", "Skipped audio for preview" if skip_audio else f"Generated voice for {len(brief.scenes)} scenes")
 
         _start("compose", "Mixing audio and video")
@@ -135,6 +141,15 @@ def run_creative_pipeline(
             raise RuntimeError("; ".join(errors))
 
         _start("finalize", "Writing metadata")
+        kimi_metadata = {
+            "mode": _brief_text_attr(brief, "mode", "deterministic-fallback"),
+            "model": _brief_text_attr(brief, "model", kimi_model or "moonshotai/kimi-k2.6"),
+            "provider": _brief_text_attr(brief, "provider", "openrouter"),
+        }
+        fallback_reason = getattr(brief, "fallback_reason", None)
+        if isinstance(fallback_reason, str) and fallback_reason:
+            kimi_metadata["fallback_reason"] = fallback_reason
+
         metadata = {
             "target": target,
             "source_type": snapshot.source_type,
@@ -149,14 +164,11 @@ def run_creative_pipeline(
                 "music_mood": brief.music_mood,
                 "total_duration": brief.total_duration,
             },
-            "kimi": {
-                "mode": "live-api" if _has_api_key() else "deterministic-fallback",
-                "model": kimi_model or "moonshotai/kimi-k2.6",
-                "provider": "openrouter",
-            },
+            "kimi": kimi_metadata,
             "tts": {
                 "provider": tts_provider,
                 "fallback_provider": fallback_tts_provider,
+                "actual_provider": actual_tts_provider,
                 "voice": voice,
                 "skipped": skip_audio,
             },
@@ -204,6 +216,28 @@ def _preview_scenes(scenes: list[dict]) -> list[dict]:
     for index, scene in enumerate(selected):
         scene["duration_seconds"] = durations[index] if index < len(durations) else 4
     return selected
+
+
+def _brief_text_attr(brief, name: str, default: str) -> str:
+    value = getattr(brief, name, default)
+    if isinstance(value, str) and value:
+        return value
+    return default
+
+
+def _validate_final_brief(brief) -> None:
+    scenes = list(getattr(brief, "scenes", []) or [])
+    if len(scenes) < 5:
+        raise RuntimeError(f"Final mode requires at least 5 scenes; got {len(scenes)}.")
+    try:
+        total_duration = sum(float(scene.get("duration_seconds", 0) or 0) for scene in scenes)
+    except (TypeError, ValueError) as exc:
+        raise RuntimeError("Final mode requires numeric scene durations.") from exc
+    if total_duration < 43 or total_duration > 62:
+        raise RuntimeError(
+            "Final mode requires summed scene durations between 43 and 62 seconds; "
+            f"got {total_duration:.1f} seconds."
+        )
 
 
 def _copy_video(video_path: Path, output_path: Path) -> Path:
@@ -290,7 +324,7 @@ def _merge_creative_video(
     fallback_tts_provider: str | None = None,
     voice: str | None = None,
     generated_music: bool = True,
-) -> Path:
+) -> dict[str, object]:
     """Merge narrations (TTS) and optional/generated music into the rendered video."""
     output_path = output_path.resolve()
     with tempfile.TemporaryDirectory() as tmpdir_str:
@@ -299,20 +333,24 @@ def _merge_creative_video(
         # Generate TTS per scene
         tts_files: list[str] = []
         scene_durations: list[float] = []
+        used_providers: list[str] = []
         for i, scene in enumerate(scenes):
             narration = scene.get("narration", "")
             duration = scene.get("duration_seconds", 10)
             scene_durations.append(float(duration))
             if narration:
                 tts_path = tmpdir / f"tts_{i:02d}.wav"
+                aligned_tts_path = tmpdir / f"tts_aligned_{i:02d}.wav"
                 generate_tts(
                     narration,
                     tts_path,
                     provider=tts_provider,
                     fallback_provider=fallback_tts_provider,
                     voice=voice,
+                    provider_report=used_providers.append,
                 )
-                tts_files.append(str(tts_path.resolve()))
+                _fit_audio_to_duration(tts_path, aligned_tts_path, float(duration))
+                tts_files.append(str(aligned_tts_path.resolve()))
 
         if not tts_files:
             # No narration: just copy video
@@ -322,7 +360,7 @@ def _merge_creative_video(
                 capture_output=True,
                 text=True,
             )
-            return output_path
+            return {"output": output_path, "actual_tts_provider": None}
 
         # Concatenate all TTS segments
         concat_list = tmpdir / "tts_concat.txt"
@@ -374,12 +412,38 @@ def _merge_creative_video(
 
         _copy_video(video_with_audio, output_path)
 
+    return {"output": output_path, "actual_tts_provider": _summarize_providers(used_providers)}
+
+
+def _fit_audio_to_duration(input_path: Path, output_path: Path, duration_seconds: float) -> Path:
+    subprocess.run(
+        [
+            "ffmpeg",
+            "-y",
+            "-i",
+            str(input_path.resolve()),
+            "-af",
+            f"apad,atrim=0:{duration_seconds:.3f}",
+            "-ar",
+            "44100",
+            "-ac",
+            "2",
+            str(output_path.resolve()),
+        ],
+        check=True,
+        capture_output=True,
+        text=True,
+    )
     return output_path
 
 
-def _has_api_key() -> bool:
-    import os
-    return bool(os.environ.get("OPENROUTER_API_KEY") or os.environ.get("KIMI_API_KEY"))
+def _summarize_providers(providers: list[str]) -> str | None:
+    if not providers:
+        return None
+    unique = sorted(set(providers))
+    if len(unique) == 1:
+        return unique[0]
+    return "mixed:" + ",".join(unique)
 
 
 def _first_readme_sentence(readme: str) -> str:

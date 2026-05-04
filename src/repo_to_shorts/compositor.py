@@ -6,6 +6,7 @@ import subprocess
 import tempfile
 import urllib.request
 from pathlib import Path
+from typing import Callable
 
 EDGE_TTS_VOICE = "en-US-AvaMultilingualNeural"
 EDGE_TTS_RATE = "+8%"
@@ -131,6 +132,7 @@ def generate_tts(
     fallback_provider: str | None = None,
     voice: str | None = None,
     allow_say_fallback: bool = False,
+    provider_report: Callable[[str], None] | None = None,
 ) -> Path:
     """Generate TTS audio using the selected provider.
 
@@ -146,6 +148,7 @@ def generate_tts(
         tmpdir = Path(tmpdir_str)
         try:
             source_path = _generate_tts_source(text, tmpdir / "tts", provider, voice, allow_say_fallback)
+            used_provider = provider
         except Exception:
             if not fallback_provider or fallback_provider == "none":
                 raise
@@ -157,11 +160,14 @@ def generate_tts(
                     voice,
                     allow_say_fallback,
                 )
+                used_provider = fallback_provider
             except Exception as fallback_exc:
                 raise RuntimeError(
                     f"TTS provider {provider!r} failed, and fallback provider "
                     f"{fallback_provider!r} also failed."
                 ) from fallback_exc
+        if provider_report is not None:
+            provider_report(used_provider)
 
         cmd_ffmpeg = [
             "ffmpeg",

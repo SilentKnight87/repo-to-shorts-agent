@@ -188,6 +188,7 @@ def test_generate_tts_uses_xai_provider(monkeypatch, tmp_path: Path):
 
 def test_generate_tts_falls_back_from_xai_to_openai(monkeypatch, tmp_path: Path):
     urls = []
+    providers = []
 
     class FakeResponse:
         def __enter__(self):
@@ -213,10 +214,17 @@ def test_generate_tts_falls_back_from_xai_to_openai(monkeypatch, tmp_path: Path)
         lambda command, **kwargs: (Path(command[-1]).write_bytes(b"fake wav"), subprocess.CompletedProcess(command, 0, "", ""))[1],
     )
 
-    result = generate_tts("Fallback voice.", tmp_path / "tts.wav", provider="xai", fallback_provider="openai")
+    result = generate_tts(
+        "Fallback voice.",
+        tmp_path / "tts.wav",
+        provider="xai",
+        fallback_provider="openai",
+        provider_report=providers.append,
+    )
 
     assert result == (tmp_path / "tts.wav").resolve()
     assert urls == ["https://api.x.ai/v1/tts", "https://api.openai.com/v1/audio/speech"]
+    assert providers == ["openai"]
 
 
 def test_generate_tts_none_provider_raises_clear_error(tmp_path: Path):

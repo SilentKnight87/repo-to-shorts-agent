@@ -214,6 +214,59 @@ def test_run_creative_pipeline_final_writes_validation_submission_and_srt(
 @patch("repo_to_shorts.hermes_skill.generate_manim_script")
 @patch("repo_to_shorts.hermes_skill.render_scene")
 @patch("repo_to_shorts.hermes_skill._merge_creative_video")
+def test_run_creative_pipeline_records_actual_kimi_and_tts_provenance(
+    mock_merge,
+    mock_render,
+    mock_script,
+    mock_direct,
+    mock_ingest,
+    mock_validate,
+    mock_submission,
+    monkeypatch,
+    tmp_path: Path,
+):
+    monkeypatch.setenv("OPENROUTER_API_KEY", "test-key")
+    mock_ingest.return_value = FakeSnapshot()
+    mock_direct.return_value = MagicMock(
+        style="dark-terminal",
+        title="Fallback Brief",
+        hook="Fallback hook",
+        scenes=[{"duration_seconds": 10, "narration": "Scene."} for _ in range(5)],
+        music_mood="electronic",
+        total_duration=50,
+        mode="api-error-fallback",
+        provider="openrouter",
+        model="moonshotai/kimi-k2.6",
+        fallback_reason="Kimi API failed: ValueError",
+    )
+    mock_script.return_value = tmp_path / "script.json"
+    raw = tmp_path / "video.mp4"
+    raw.write_bytes(b"raw")
+    mock_render.return_value = raw
+    mock_merge.return_value = {"output": tmp_path / "demo.mp4", "actual_tts_provider": "openai"}
+    mock_validate.return_value = {"ok": True, "errors": []}
+
+    result = run_creative_pipeline(".", out_dir=tmp_path, tts_provider="xai", fallback_tts_provider="openai")
+
+    metadata = json.loads((Path(result["run_dir"]) / "metadata.json").read_text(encoding="utf-8"))
+
+    assert metadata["kimi"]["mode"] == "api-error-fallback"
+    assert metadata["kimi"]["provider"] == "openrouter"
+    assert metadata["kimi"]["model"] == "moonshotai/kimi-k2.6"
+    assert metadata["kimi"]["fallback_reason"] == "Kimi API failed: ValueError"
+    assert metadata["tts"]["provider"] == "xai"
+    assert metadata["tts"]["fallback_provider"] == "openai"
+    assert metadata["tts"]["actual_provider"] == "openai"
+    assert mock_submission.call_args.kwargs["metadata"] == metadata
+
+
+@patch("repo_to_shorts.hermes_skill.write_submission_pack")
+@patch("repo_to_shorts.hermes_skill.validate_media")
+@patch("repo_to_shorts.hermes_skill.ingest_target")
+@patch("repo_to_shorts.hermes_skill.direct")
+@patch("repo_to_shorts.hermes_skill.generate_manim_script")
+@patch("repo_to_shorts.hermes_skill.render_scene")
+@patch("repo_to_shorts.hermes_skill._merge_creative_video")
 def test_run_creative_pipeline_records_tts_only_when_generated_music_disabled(
     mock_merge,
     mock_render,
@@ -292,6 +345,7 @@ def test_run_creative_pipeline_final_tts_none_copies_video_and_validates_without
     mock_copy.assert_called_once()
     mock_validate.assert_called_once_with(Path(result["output"]), require_audio=False)
     assert metadata["tts"]["skipped"] is True
+    assert metadata["tts"]["actual_provider"] is None
     assert metadata["render"]["audio"] == "skipped"
     assert mock_submission.call_args.kwargs["metadata"] == metadata
 
@@ -334,13 +388,83 @@ def test_run_creative_pipeline_final_fails_bad_validation(
         raise AssertionError("final mode should fail when validation fails")
 
 
+@patch("repo_to_shorts.hermes_skill.ingest_target")
+@patch("repo_to_shorts.hermes_skill.direct")
+@patch("repo_to_shorts.hermes_skill.generate_manim_script")
+@patch("repo_to_shorts.hermes_skill.render_scene")
+def test_run_creative_pipeline_final_rejects_too_few_scenes_before_rendering(
+    mock_render,
+    mock_script,
+    mock_direct,
+    mock_ingest,
+    tmp_path: Path,
+):
+    mock_ingest.return_value = FakeSnapshot()
+    mock_direct.return_value = MagicMock(
+        style="dark-terminal",
+        title="Too Short",
+        hook="Too short",
+        scenes=[{"duration_seconds": 15, "narration": "Scene."} for _ in range(3)],
+        music_mood="electronic",
+        total_duration=45,
+    )
+
+    try:
+        run_creative_pipeline(".", out_dir=tmp_path, final=True)
+    except RuntimeError as exc:
+        assert "at least 5 scenes" in str(exc)
+    else:
+        raise AssertionError("final mode should reject briefs with too few scenes")
+
+    mock_script.assert_not_called()
+    mock_render.assert_not_called()
+
+
+@patch("repo_to_shorts.hermes_skill.ingest_target")
+@patch("repo_to_shorts.hermes_skill.direct")
+@patch("repo_to_shorts.hermes_skill.generate_manim_script")
+@patch("repo_to_shorts.hermes_skill.render_scene")
+def test_run_creative_pipeline_final_rejects_invalid_duration_before_rendering(
+    mock_render,
+    mock_script,
+    mock_direct,
+    mock_ingest,
+    tmp_path: Path,
+):
+    mock_ingest.return_value = FakeSnapshot()
+    mock_direct.return_value = MagicMock(
+        style="dark-terminal",
+        title="Bad Duration",
+        hook="Bad duration",
+        scenes=[{"duration_seconds": 6, "narration": "Scene."} for _ in range(5)],
+        music_mood="electronic",
+        total_duration=30,
+    )
+
+    try:
+        run_creative_pipeline(".", out_dir=tmp_path, final=True)
+    except RuntimeError as exc:
+        assert "between 43 and 62 seconds" in str(exc)
+    else:
+        raise AssertionError("final mode should reject briefs outside duration bounds")
+
+    mock_script.assert_not_called()
+    mock_render.assert_not_called()
+
+
 @patch("repo_to_shorts.hermes_skill.burn_karaoke_captions", create=True)
 @patch("repo_to_shorts.hermes_skill.mix_audio")
 @patch("repo_to_shorts.hermes_skill.generate_ambient_music")
 @patch("repo_to_shorts.hermes_skill.generate_tts")
 @patch("repo_to_shorts.hermes_skill.subprocess.run")
 def test_merge_creative_video_with_narration_avoids_duplicate_caption_burn(
-    mock_run, mock_tts, mock_generate_music, mock_mix_audio, mock_burn_captions, tmp_path: Path
+    mock_run,
+    mock_tts,
+    mock_generate_music,
+    mock_mix_audio,
+    mock_burn_captions,
+    monkeypatch,
+    tmp_path: Path,
 ):
     video = tmp_path / "video.mp4"
     video.write_text("fake video")
@@ -351,6 +475,20 @@ def test_merge_creative_video_with_narration_avoids_duplicate_caption_burn(
         {"narration": "Second scene", "duration_seconds": 3},
     ]
 
+    persistent_tmp = tmp_path / "merge-tmp"
+
+    class PersistentTemporaryDirectory:
+        def __enter__(self):
+            persistent_tmp.mkdir(parents=True, exist_ok=True)
+            return str(persistent_tmp)
+
+        def __exit__(self, *args):
+            return False
+
+    monkeypatch.setattr(
+        "repo_to_shorts.hermes_skill.tempfile.TemporaryDirectory",
+        lambda: PersistentTemporaryDirectory(),
+    )
     mock_tts.return_value = tmp_path / "tts.wav"
 
     _merge_creative_video(video, scenes, output)
@@ -359,7 +497,14 @@ def test_merge_creative_video_with_narration_avoids_duplicate_caption_burn(
     mock_generate_music.assert_called_once()
     assert mock_mix_audio.call_args.kwargs["duration_seconds"] == 6
     mock_burn_captions.assert_not_called()
-    assert mock_run.call_count >= 3  # concat + merge + remux final
+    assert mock_run.call_count >= 5  # fit each scene + concat + merge + remux final
+    commands = [call.args[0] for call in mock_run.call_args_list]
+    fit_commands = [cmd for cmd in commands if "-af" in cmd and "apad,atrim=0:3.000" in cmd]
+    assert len(fit_commands) == 2
+    concat_text = (persistent_tmp / "tts_concat.txt").read_text(encoding="utf-8")
+    assert "tts_aligned_00.wav" in concat_text
+    assert "tts_aligned_01.wav" in concat_text
+    assert "file '" + str((persistent_tmp / "tts_00.wav").resolve()) + "'" not in concat_text
     final_remux_args = mock_run.call_args[0][0]
     assert final_remux_args[:2] == ["ffmpeg", "-y"]
     assert "-c" in final_remux_args

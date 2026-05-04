@@ -15,20 +15,35 @@ class CreativeBrief:
     scenes: list = field(default_factory=list)
     music_mood: str = "ambient"
     total_duration: int = 60
+    mode: str = "deterministic-fallback"
+    provider: str = "openrouter"
+    model: str = "moonshotai/kimi-k2.6"
+    fallback_reason: str | None = None
 
 
 def direct(repo_analysis: dict, model: str = "moonshotai/kimi-k2.6", *, final: bool = False) -> CreativeBrief:
     """Kimi 2.6 creative director: analyze repo → output creative brief."""
     api_key = os.environ.get("OPENROUTER_API_KEY") or os.environ.get("KIMI_API_KEY")
     if not api_key:
-        return _deterministic_fallback(repo_analysis)
+        return _deterministic_fallback(repo_analysis, model=model)
 
     prompt = _build_director_prompt(repo_analysis, final=final)
     try:
         response = _call_openrouter_api(prompt, model, "https://openrouter.ai/api/v1")
-        return _parse_brief(response)
-    except Exception:  # noqa: BLE001 - fallback should preserve CLI reliability.
-        return _deterministic_fallback(repo_analysis)
+        brief = _parse_brief(response)
+        brief.mode = "live-api"
+        brief.provider = "openrouter"
+        brief.model = model
+        brief.fallback_reason = None
+        return brief
+    except Exception as exc:  # noqa: BLE001 - fallback should preserve CLI reliability.
+        return _deterministic_fallback(
+            repo_analysis,
+            mode="api-error-fallback",
+            provider="openrouter",
+            model=model,
+            fallback_reason=f"Kimi API failed: {exc.__class__.__name__}",
+        )
 
 
 def _build_director_prompt(analysis: dict, *, final: bool = False) -> str:
@@ -84,7 +99,14 @@ Final export constraints:
     return prompt
 
 
-def _deterministic_fallback(analysis: dict) -> CreativeBrief:
+def _deterministic_fallback(
+    analysis: dict,
+    *,
+    mode: str = "deterministic-fallback",
+    provider: str = "openrouter",
+    model: str = "moonshotai/kimi-k2.6",
+    fallback_reason: str | None = None,
+) -> CreativeBrief:
     """Fallback when no API key — still decent, not slop."""
     repo = analysis.get("repo_name", "This Repo")
     return CreativeBrief(
@@ -110,6 +132,10 @@ def _deterministic_fallback(analysis: dict) -> CreativeBrief:
         ],
         music_mood="electronic",
         total_duration=60,
+        mode=mode,
+        provider=provider,
+        model=model,
+        fallback_reason=fallback_reason,
     )
 
 
@@ -133,6 +159,10 @@ def _parse_brief(content: str) -> CreativeBrief:
         scenes=data.get("scenes", []),
         music_mood=data.get("music_mood", "ambient"),
         total_duration=data.get("total_duration", 60),
+        mode=data.get("mode", "deterministic-fallback"),
+        provider=data.get("provider", "openrouter"),
+        model=data.get("model", "moonshotai/kimi-k2.6"),
+        fallback_reason=data.get("fallback_reason"),
     )
 
 
