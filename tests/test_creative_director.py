@@ -5,6 +5,7 @@ import json
 from repo_to_shorts.creative_director import (
     CreativeBrief,
     _deterministic_fallback,
+    _loads_brief_json,
     _parse_brief,
     direct,
 )
@@ -72,8 +73,8 @@ def test_direct_fallback_when_no_api_key(monkeypatch):
 
     assert isinstance(result, CreativeBrief)
     assert result.style == "dark-terminal"
-    assert result.title == "fallback-repo: What It Builds"
-    assert result.hook == "One repo. Infinite possibilities."
+    assert result.title == "fallback-repo: The Repo That Edits Itself Into a Trailer"
+    assert result.hook == "A codebase walks into a cinema."
     assert len(result.scenes) == 5
     assert result.total_duration == 60
 
@@ -112,6 +113,21 @@ def test_parse_brief_handles_plain_json():
     assert len(result.scenes) == 1
 
 
+def test_loads_brief_json_extracts_object_from_model_chatter():
+    raw = "Here is the brief:\n{\n  \"style\": \"cinematic\",\n  \"title\": \"Recovered\"\n}\nShip it."
+    data = _loads_brief_json(raw)
+    assert data["style"] == "cinematic"
+    assert data["title"] == "Recovered"
+
+
+def test_direct_falls_back_when_model_returns_malformed_json(monkeypatch):
+    monkeypatch.setenv("OPENROUTER_API_KEY", "test-key")
+    monkeypatch.setattr("repo_to_shorts.creative_director._call_openrouter_api", lambda *_: "not json")
+    result = direct({"repo_name": "bad-json-repo"})
+    assert result.title == "bad-json-repo: The Repo That Edits Itself Into a Trailer"
+    assert len(result.scenes) == 5
+
+
 def test_deterministic_fallback_returns_expected_structure():
     analysis = {
         "repo_name": "test-repo",
@@ -124,8 +140,8 @@ def test_deterministic_fallback_returns_expected_structure():
 
     assert isinstance(result, CreativeBrief)
     assert result.style == "dark-terminal"
-    assert result.title == "test-repo: What It Builds"
-    assert result.hook == "One repo. Infinite possibilities."
+    assert result.title == "test-repo: The Repo That Edits Itself Into a Trailer"
+    assert result.hook == "A codebase walks into a cinema."
     assert len(result.scenes) == 5
     assert result.music_mood == "electronic"
     assert result.total_duration == 60

@@ -53,6 +53,46 @@ class TestHomePage:
         assert 'name="audience"' in html
         assert 'name="kimi_model"' in html
         assert 'name="render_mp4"' in html
+        assert 'name="preview"' in html
+        assert 'name="skip_audio"' in html
+
+    def test_home_page_includes_submit_loading_indicator(self):
+        html = render_home_page([])
+
+        assert 'id="generate-form"' in html
+        assert 'role="status"' in html
+        assert 'aria-live="polite"' in html
+        assert 'aria-atomic="true"' in html
+        assert "Generating your short package" in html
+        assert "loading-panel" in html
+        assert "spinner" in html
+        assert "is-submitting" in html
+        assert "aria-busy" in html
+        assert "Generating…" in html
+
+    def test_home_page_submit_script_posts_existing_form_after_loading_repaint(self):
+        html = render_home_page([])
+
+        assert 'method="POST"' in html
+        assert 'action="/generate"' in html
+        assert 'addEventListener("submit"' in html
+        assert "event.preventDefault()" in html
+        assert "window.setTimeout" in html
+        assert "HTMLFormElement.prototype.submit.call(form)" in html
+
+    def test_loading_panel_is_hidden_until_submit_state(self):
+        html = render_home_page([])
+
+        assert ".loading-panel { display: none" in html
+        assert ".form-card.is-submitting .loading-panel { display: block" in html
+
+    def test_home_page_includes_premium_demo_surface(self):
+        html = render_home_page([])
+
+        assert "Demo cockpit" in html
+        assert "artifact-gallery" in html
+        assert "Repo signal, edited like a launch film" in html
+        assert "Proof layer" in html
 
     def test_home_page_shows_latest_runs(self, tmp_path: Path):
         run1 = tmp_path / "20260503-092819-repo-to-shorts-agent"
@@ -164,6 +204,8 @@ class TestGenerate:
                 "audience": "hackathon judges",
                 "kimi_model": "moonshotai/kimi-k2.6",
                 "creative_mode": "on",
+                "preview": "on",
+                "skip_audio": "on",
             }).encode()
             req = urllib.request.Request(f"http://127.0.0.1:{port}/generate", data=data, method="POST")
             with urllib.request.urlopen(req) as resp:
@@ -177,6 +219,8 @@ class TestGenerate:
         assert len(creative_calls) == 1
         assert len(analyze_calls) == 0
         assert creative_calls[0]["target"] == "https://github.com/owner/repo"
+        assert creative_calls[0]["preview"] is True
+        assert creative_calls[0]["skip_audio"] is True
 
     def test_generate_classic_mode_when_creative_unchecked(self, tmp_path: Path, monkeypatch):
         analyze_calls = []

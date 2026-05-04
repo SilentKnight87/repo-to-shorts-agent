@@ -4,6 +4,11 @@ import subprocess
 import tempfile
 from pathlib import Path
 
+EDGE_TTS_VOICE = "en-US-AvaMultilingualNeural"
+EDGE_TTS_RATE = "+8%"
+EDGE_TTS_PITCH = "+2Hz"
+EDGE_TTS_VOLUME = "+0%"
+
 
 def compose(scenes: list[dict], output_path: Path, music_path: Path | None = None) -> Path:
     """Compose scenes into final video with TTS narration, music, captions.
@@ -50,7 +55,7 @@ def compose(scenes: list[dict], output_path: Path, music_path: Path | None = Non
         stitched = tmpdir / "stitched.mp4"
         _stitch_scenes(scene_videos, stitched)
 
-        # Build captions
+        # Build karaoke captions
         captions: list[dict] = []
         current_time = 0.0
         for scene in scenes:
@@ -63,7 +68,7 @@ def compose(scenes: list[dict], output_path: Path, music_path: Path | None = Non
             )
             current_time += scene["duration_seconds"]
 
-        burn_captions(stitched, captions, output_path)
+        burn_karaoke_captions(stitched, captions, output_path)
 
     return output_path
 
@@ -115,24 +120,55 @@ def _stitch_scenes(scene_paths: list[Path], output_path: Path) -> None:
     subprocess.run(cmd, check=True, capture_output=True, text=True)
 
 
-def generate_tts(text: str, output_path: Path) -> Path:
-    """Generate TTS audio using macOS `say` command.
+def generate_tts(text: str, output_path: Path, *, allow_say_fallback: bool = False) -> Path:
+    """Generate TTS audio using Edge neural voice by default.
 
-    Uses: say -o <output.aiff> <text>
-    Then converts to WAV via ffmpeg for mixing.
+    Creative/postable renders should fail loudly if Edge TTS is unavailable instead
+    of silently degrading to macOS ``say``. ``allow_say_fallback`` exists only for
+    explicit local/offline use.
     """
     output_path = output_path.resolve()
     with tempfile.TemporaryDirectory() as tmpdir_str:
         tmpdir = Path(tmpdir_str)
-        aiff_path = tmpdir / "tts.aiff"
-        cmd_say = ["say", "-o", str(aiff_path.resolve()), text]
-        subprocess.run(cmd_say, check=True, capture_output=True, text=True)
+        mp3_path = tmpdir / "tts.mp3"
+
+        # Try edge-tts first for neural voice quality.
+        try:
+            cmd = [
+                "edge-tts",
+                "--voice",
+                EDGE_TTS_VOICE,
+                "--rate",
+                EDGE_TTS_RATE,
+                "--pitch",
+                EDGE_TTS_PITCH,
+                "--volume",
+                EDGE_TTS_VOLUME,
+                "--text",
+                text,
+                "--write-media",
+                str(mp3_path.resolve()),
+            ]
+            subprocess.run(cmd, check=True, capture_output=True, text=True)
+            source_path = mp3_path
+        except (subprocess.CalledProcessError, FileNotFoundError) as exc:
+            if not allow_say_fallback:
+                raise RuntimeError(
+                    "Edge TTS failed; install/configure edge-tts or pass "
+                    "allow_say_fallback=True for non-postable local drafts."
+                ) from exc
+
+            # Explicit opt-in fallback only; never silently degrade creative renders.
+            aiff_path = tmpdir / "tts.aiff"
+            cmd_say = ["say", "-o", str(aiff_path.resolve()), text]
+            subprocess.run(cmd_say, check=True, capture_output=True, text=True)
+            source_path = aiff_path
 
         cmd_ffmpeg = [
             "ffmpeg",
             "-y",
             "-i",
-            str(aiff_path.resolve()),
+            str(source_path.resolve()),
             "-ar",
             "44100",
             "-ac",
@@ -152,10 +188,15 @@ def mix_audio(voice_path: Path, music_path: Path | None, output_path: Path, dura
             "-y",
             "-i",
             str(voice_path.resolve()),
+            "-stream_loop",
+            "-1",
             "-i",
             str(music_path.resolve()),
             "-filter_complex",
-            "[1:a]volume=0.25[bg];[0:a][bg]amix=inputs=2:duration=first:dropout_transition=0[out]",
+            "[0:a]loudnorm=I=-16:TP=-1.5:LRA=11,apad[voice];"
+            "[1:a]volume=0.18,highpass=f=70,lowpass=f=7000[bed];"
+            "[bed][voice]sidechaincompress=threshold=0.03:ratio=8:attack=20:release=300[ducked];"
+            "[voice][ducked]amix=inputs=2:duration=longest:dropout_transition=0,alimiter=limit=0.95[out]",
             "-map",
             "[out]",
             "-t",
@@ -186,19 +227,101 @@ def mix_audio(voice_path: Path, music_path: Path | None, output_path: Path, dura
     return output_path
 
 
+def burn_karaoke_captions(video_path: Path, captions: list[dict], output_path: Path) -> Path:
+    """Burn karaoke-style captions into video using ffmpeg drawtext.
+
+    Shows 2-3 words at a time, highlighting each phrase sequentially.
+    Falls back to copying the video if this ffmpeg build lacks drawtext.
+    """
+    output_path = output_path.resolve()
+    if not _ffmpeg_has_filter("drawtext"):
+        _copy_video(video_path, output_path)
+        return output_path
+
+    filter_parts = []
+    font_path = "/System/Library/Fonts/HelveticaNeue.ttc"
+    import os
+    if not os.path.exists(font_path):
+        font_path = "/System/Library/Fonts/Supplemental/Arial.ttf"
+
+    for cap in captions:
+        words = cap["text"].split()
+        duration = cap["duration"]
+        start = cap["start"]
+        if not words:
+            continue
+
+        # Group words into chunks of 2-3 for readability
+        chunk_size = 3 if len(words) > 6 else 2
+        chunks = [words[i:i + chunk_size] for i in range(0, len(words), chunk_size)]
+        chunk_duration = duration / len(chunks)
+
+        for chunk_index, chunk in enumerate(chunks):
+            chunk_start = start + chunk_index * chunk_duration
+            chunk_end = chunk_start + chunk_duration + 0.3  # slight overlap for smoothness
+            text = _escape_drawtext(" ".join(chunk))
+            filter_parts.append(
+                f"drawtext=fontfile={font_path}"
+                f":text='{text}'"
+                f":fontsize=72"
+                f":fontcolor=0x22D3EE"
+                f":borderw=4"
+                f":bordercolor=0x000000"
+                f":box=1"
+                f":boxcolor=0x000000@0.6"
+                f":boxborderw=20"
+                f":x=(w-text_w)/2"
+                f":y=(h*3/4)"
+                f":enable='between(t\\,{chunk_start}\\,{chunk_end})'"
+            )
+
+    vf = ",".join(filter_parts)
+    if vf:
+        vf += ",format=yuv420p"
+    else:
+        vf = "format=yuv420p"
+
+    cmd = [
+        "ffmpeg",
+        "-y",
+        "-i",
+        str(video_path.resolve()),
+        "-vf",
+        vf,
+        "-c:v",
+        "libx264",
+        "-c:a",
+        "copy",
+        "-movflags",
+        "+faststart",
+        str(output_path),
+    ]
+    subprocess.run(cmd, check=True, capture_output=True, text=True)
+    return output_path
+
+
 def burn_captions(video_path: Path, captions: list[dict], output_path: Path) -> Path:
-    """Burn SRT-style captions into video using ffmpeg drawtext.
+    """Burn SRT-style captions into video using ffmpeg drawtext (legacy, full-line).
 
     captions: list of {text, start, duration}
     """
     output_path = output_path.resolve()
+    if not _ffmpeg_has_filter("drawtext"):
+        _copy_video(video_path, output_path)
+        return output_path
+
     filter_parts = []
+    font_path = "/System/Library/Fonts/HelveticaNeue.ttc"
+    import os
+    if not os.path.exists(font_path):
+        font_path = "/System/Library/Fonts/Supplemental/Arial.ttf"
+
     for cap in captions:
         text = _escape_drawtext(cap["text"])
         start = cap["start"]
         end = cap["start"] + cap["duration"]
         filter_parts.append(
-            f"drawtext=fontfile=/System/Library/Fonts/Menlo.ttc"
+            f"drawtext=fontfile={font_path}"
             f":text='{text}'"
             f":fontsize=56"
             f":fontcolor=white"
@@ -232,6 +355,64 @@ def burn_captions(video_path: Path, captions: list[dict], output_path: Path) -> 
     ]
     subprocess.run(cmd, check=True, capture_output=True, text=True)
     return output_path
+
+
+def generate_ambient_music(output_path: Path, duration: int = 60) -> Path:
+    """Generate a simple electronic synth bed using ffmpeg lavfi."""
+    output_path = output_path.resolve()
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    fade_out_start = max(float(duration) - 2.0, 0.0)
+    synth_expr = (
+        "aevalsrc="
+        "0.10*sin(2*PI*55*t)+0.075*sin(2*PI*110*t)+"
+        "0.045*sin(2*PI*165*t)+0.030*sin(2*PI*220*t)"
+        f":s=44100:d={duration}"
+    )
+    cmd = [
+        "ffmpeg",
+        "-y",
+        "-f",
+        "lavfi",
+        "-i",
+        synth_expr,
+        "-af",
+        "tremolo=f=4.5:d=0.35,lowpass=f=1800,highpass=f=45,"
+        "acompressor=threshold=-18dB:ratio=3:attack=20:release=250,"
+        "afade=t=in:st=0:d=1.2,"
+        f"afade=t=out:st={fade_out_start:.2f}:d=2,volume=0.16",
+        "-t",
+        str(duration),
+        "-c:a",
+        "libmp3lame",
+        "-b:a",
+        "128k",
+        str(output_path),
+    ]
+    subprocess.run(cmd, check=True, capture_output=True, text=True)
+    return output_path
+
+
+def _ffmpeg_has_filter(name: str) -> bool:
+    try:
+        result = subprocess.run(
+            ["ffmpeg", "-hide_banner", "-filters"],
+            check=True,
+            capture_output=True,
+            text=True,
+        )
+    except (subprocess.CalledProcessError, FileNotFoundError):
+        return False
+    return any(line.split()[1:2] == [name] for line in result.stdout.splitlines() if line.split())
+
+
+def _copy_video(video_path: Path, output_path: Path) -> None:
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    subprocess.run(
+        ["ffmpeg", "-y", "-i", str(video_path.resolve()), "-c", "copy", str(output_path.resolve())],
+        check=True,
+        capture_output=True,
+        text=True,
+    )
 
 
 def _escape_drawtext(text: str) -> str:

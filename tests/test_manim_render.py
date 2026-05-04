@@ -6,7 +6,13 @@ from pathlib import Path
 
 import pytest
 
-from repo_to_shorts.manim_render import generate_manim_script, render_scene
+from repo_to_shorts.manim_render import (
+    _active_caption_chunk,
+    _caption_chunks,
+    _fit_caption_lines,
+    generate_manim_script,
+    render_scene,
+)
 
 
 def test_generate_manim_script_returns_valid_descriptor(tmp_path: Path):
@@ -38,6 +44,47 @@ def test_generate_manim_script_defaults_style(tmp_path: Path):
 
     data = json.loads(script_path.read_text(encoding="utf-8"))
     assert data["style"] == "dark-terminal"
+
+
+def test_generate_manim_script_accepts_fast_preview_fps(tmp_path: Path):
+    scene = {"scenes": [], "fps": 12}
+    repo_analysis = {"name": "test-repo", "description": "", "components": []}
+
+    script_path = generate_manim_script(scene, repo_analysis, tmp_path / "out")
+
+    data = json.loads(script_path.read_text(encoding="utf-8"))
+    assert data["fps"] == 12
+
+
+def test_caption_chunks_create_karaoke_phrases():
+    chunks = _caption_chunks("This repo turns source code into a launch film with proof", words_per_chunk=3)
+
+    assert chunks == [
+        "This repo turns",
+        "source code into",
+        "a launch film",
+        "with proof",
+    ]
+
+
+def test_active_caption_chunk_advances_with_scene_time():
+    text = "This repo turns source code into a launch film with proof"
+
+    assert _active_caption_chunk(text, 0.0)[0] == "This repo turns"
+    assert _active_caption_chunk(text, 0.5)[0] == "a launch film"
+    assert _active_caption_chunk(text, 1.0)[0] == "with proof"
+
+
+def test_fit_caption_lines_keeps_long_chunks_inside_safe_width():
+    pytest.importorskip("PIL")
+    from PIL import Image, ImageDraw
+
+    image = Image.new("RGB", (1080, 1920))
+    draw = ImageDraw.Draw(image)
+    lines, font = _fit_caption_lines(draw, "the product works. the story doesn't.", 828)
+
+    assert 1 <= len(lines) <= 2
+    assert all(draw.textlength(line, font=font) <= 828 for line in lines)
 
 
 def test_render_scene_creates_mp4(monkeypatch, tmp_path: Path):
