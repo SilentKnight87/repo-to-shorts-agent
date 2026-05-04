@@ -95,7 +95,13 @@ Return:
 """
 
 
-def _call_openrouter_api(prompt: str, model: str, base_url: str) -> str:
+def _call_openrouter_api(
+    prompt: str,
+    model: str,
+    base_url: str,
+    *,
+    response_format: dict[str, str] | None = None,
+) -> str:
     api_key = os.environ.get("OPENROUTER_API_KEY") or os.environ.get("KIMI_API_KEY")
     if not api_key:
         raise RuntimeError("OPENROUTER_API_KEY or KIMI_API_KEY not set")
@@ -111,6 +117,8 @@ def _call_openrouter_api(prompt: str, model: str, base_url: str) -> str:
         "max_tokens": 3000,
         "reasoning": {"enabled": False},
     }
+    if response_format is not None:
+        payload["response_format"] = response_format
     headers = {
         "Authorization": f"Bearer {api_key}",
         "Content-Type": "application/json",

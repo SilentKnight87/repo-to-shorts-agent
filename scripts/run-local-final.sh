@@ -10,6 +10,7 @@ AUDIENCE="${AUDIENCE:-Nous Research Hermes Agent Creative Hackathon judges}"
 KIMI_MODEL="${KIMI_MODEL:-moonshotai/kimi-k2.6}"
 TTS_PROVIDER="${TTS_PROVIDER:-xai}"
 FALLBACK_TTS_PROVIDER="${FALLBACK_TTS_PROVIDER:-openai}"
+REQUIRE_LIVE_KIMI="${REQUIRE_LIVE_KIMI:-1}"
 
 if [[ -f ".env" ]]; then
   set -a
@@ -58,6 +59,18 @@ echo "Submission pack: $run_dir/submission_pack.md"
 if command -v jq >/dev/null 2>&1 && [[ -f "$run_dir/metadata.json" ]]; then
   echo
   jq '{kimi: .kimi, tts: .tts, validation: .render.validation}' "$run_dir/metadata.json"
+
+  kimi_mode="$(jq -r '.kimi.mode // ""' "$run_dir/metadata.json")"
+  if [[ "$REQUIRE_LIVE_KIMI" == "1" && "$kimi_mode" != "live-api" ]]; then
+    echo
+    echo "This runner requires live Kimi, but metadata.json recorded kimi.mode=$kimi_mode." >&2
+    echo "Run preserved for debugging: $run_dir" >&2
+    exit 2
+  fi
+elif [[ "$REQUIRE_LIVE_KIMI" == "1" ]]; then
+  echo "This runner requires live Kimi validation, but jq or metadata.json is unavailable." >&2
+  echo "Run preserved for debugging: $run_dir" >&2
+  exit 2
 fi
 
 if [[ "${OPEN_VIDEO:-1}" == "1" && -f "$run_dir/demo.mp4" ]]; then

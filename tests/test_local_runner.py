@@ -19,3 +19,6 @@ def test_local_final_runner_is_executable_and_pins_default_workflow():
     assert "--final" in text
     assert "metadata.json" in text
     assert "demo.mp4" in text
+    assert 'REQUIRE_LIVE_KIMI="${REQUIRE_LIVE_KIMI:-1}"' in text
+    assert '.kimi.mode // ""' in text
+    assert "requires live Kimi" in text

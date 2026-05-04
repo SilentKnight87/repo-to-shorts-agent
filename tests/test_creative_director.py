@@ -13,10 +13,10 @@ from repo_to_shorts.creative_director import (
 
 
 def test_direct_returns_valid_creative_brief_with_mocked_api(monkeypatch):
-    calls: list[tuple[str, str, str]] = []
+    calls: list[tuple[str, str, str, dict | None]] = []
 
-    def fake_call(prompt: str, model: str, base_url: str) -> str:
-        calls.append((prompt, model, base_url))
+    def fake_call(prompt: str, model: str, base_url: str, *, response_format: dict | None = None) -> str:
+        calls.append((prompt, model, base_url, response_format))
         brief = {
             "style": "clean-academic",
             "title": "Test Title",
@@ -61,6 +61,7 @@ def test_direct_returns_valid_creative_brief_with_mocked_api(monkeypatch):
     assert result.fallback_reason is None
     assert calls[0][1] == "moonshotai/kimi-k2.6"
     assert "my-repo" in calls[0][0]
+    assert calls[0][3] == {"type": "json_object"}
 
 
 def test_direct_fallback_when_no_api_key(monkeypatch):
@@ -149,7 +150,7 @@ def test_loads_brief_json_extracts_object_from_model_chatter():
 
 def test_direct_falls_back_when_model_returns_malformed_json(monkeypatch):
     monkeypatch.setenv("OPENROUTER_API_KEY", "test-key")
-    monkeypatch.setattr("repo_to_shorts.creative_director._call_openrouter_api", lambda *_: "not json")
+    monkeypatch.setattr("repo_to_shorts.creative_director._call_openrouter_api", lambda *_, **__: "not json")
     result = direct({"repo_name": "bad-json-repo"})
     assert result.title == "bad-json-repo: The Repo That Edits Itself Into a Trailer"
     assert len(result.scenes) == 5
@@ -165,7 +166,7 @@ def test_direct_live_success_records_proof_fields(monkeypatch):
     monkeypatch.setenv("OPENROUTER_API_KEY", "test-key")
     monkeypatch.setattr(
         "repo_to_shorts.creative_director._call_openrouter_api",
-        lambda *_: json.dumps({
+        lambda *_, **__: json.dumps({
             "style": "cinematic",
             "title": "Live Title",
             "hook": "Live hook.",

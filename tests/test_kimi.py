@@ -133,3 +133,35 @@ def test_call_openrouter_api_sends_openai_compatible_chat_request(monkeypatch):
     assert payload["max_tokens"] == 3000
     assert payload["reasoning"] == {"enabled": False}
     assert request.headers["Authorization"] == "Bearer test-key"
+
+
+def test_call_openrouter_api_can_request_json_object_response(monkeypatch):
+    requests = []
+
+    class FakeResponse:
+        def __enter__(self):
+            return self
+
+        def __exit__(self, exc_type, exc, tb):
+            return False
+
+        def read(self) -> bytes:
+            return json.dumps({"choices": [{"message": {"content": "{\"ok\": true}"}}]}).encode("utf-8")
+
+    def fake_urlopen(request, timeout):
+        requests.append(request)
+        return FakeResponse()
+
+    monkeypatch.setenv("OPENROUTER_API_KEY", "test-key")
+    monkeypatch.setattr("repo_to_shorts.kimi.request.urlopen", fake_urlopen)
+
+    result = __import__("repo_to_shorts.kimi", fromlist=["_call_openrouter_api"])._call_openrouter_api(
+        "prompt",
+        "moonshotai/kimi-k2.6",
+        "https://openrouter.ai/api/v1",
+        response_format={"type": "json_object"},
+    )
+
+    assert result == "{\"ok\": true}"
+    payload = json.loads(requests[0].data.decode("utf-8"))
+    assert payload["response_format"] == {"type": "json_object"}

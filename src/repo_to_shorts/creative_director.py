@@ -29,7 +29,12 @@ def direct(repo_analysis: dict, model: str = "moonshotai/kimi-k2.6", *, final: b
 
     prompt = _build_director_prompt(repo_analysis, final=final)
     try:
-        response = _call_openrouter_api(prompt, model, "https://openrouter.ai/api/v1")
+        response = _call_openrouter_api(
+            prompt,
+            model,
+            "https://openrouter.ai/api/v1",
+            response_format={"type": "json_object"},
+        )
         brief = _parse_brief(response)
         brief.mode = "live-api"
         brief.provider = "openrouter"
