@@ -6,7 +6,7 @@ import tempfile
 from datetime import datetime
 from pathlib import Path
 
-from repo_to_shorts.compositor import burn_karaoke_captions, generate_ambient_music, generate_tts, mix_audio
+from repo_to_shorts.compositor import generate_ambient_music, generate_tts, mix_audio
 from repo_to_shorts.creative_director import direct
 from repo_to_shorts.ingest import ingest_target
 from repo_to_shorts.manim_render import generate_manim_script, render_scene
@@ -291,7 +291,7 @@ def _merge_creative_video(
     voice: str | None = None,
     generated_music: bool = True,
 ) -> Path:
-    """Merge narrations (TTS), optional/generated music, and karaoke captions into the rendered video."""
+    """Merge narrations (TTS) and optional/generated music into the rendered video."""
     output_path = output_path.resolve()
     with tempfile.TemporaryDirectory() as tmpdir_str:
         tmpdir = Path(tmpdir_str)
@@ -372,22 +372,7 @@ def _merge_creative_video(
             text=True,
         )
 
-        # Build karaoke captions
-        caption_data = []
-        current_time = 0.0
-        for scene in scenes:
-            narration = scene.get("narration", "")
-            duration = scene.get("duration_seconds", 10)
-            if narration:
-                caption_data.append({
-                    "text": narration,
-                    "start": current_time,
-                    "duration": float(duration),
-                })
-            current_time += float(duration)
-
-        # Burn captions onto final video
-        burn_karaoke_captions(video_with_audio, caption_data, output_path)
+        _copy_video(video_with_audio, output_path)
 
     return output_path
 

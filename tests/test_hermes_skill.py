@@ -334,12 +334,12 @@ def test_run_creative_pipeline_final_fails_bad_validation(
         raise AssertionError("final mode should fail when validation fails")
 
 
-@patch("repo_to_shorts.hermes_skill.burn_karaoke_captions")
+@patch("repo_to_shorts.hermes_skill.burn_karaoke_captions", create=True)
 @patch("repo_to_shorts.hermes_skill.mix_audio")
 @patch("repo_to_shorts.hermes_skill.generate_ambient_music")
 @patch("repo_to_shorts.hermes_skill.generate_tts")
 @patch("repo_to_shorts.hermes_skill.subprocess.run")
-def test_merge_creative_video_with_narration(
+def test_merge_creative_video_with_narration_avoids_duplicate_caption_burn(
     mock_run, mock_tts, mock_generate_music, mock_mix_audio, mock_burn_captions, tmp_path: Path
 ):
     video = tmp_path / "video.mp4"
@@ -358,8 +358,13 @@ def test_merge_creative_video_with_narration(
     assert mock_tts.call_count == 2
     mock_generate_music.assert_called_once()
     assert mock_mix_audio.call_args.kwargs["duration_seconds"] == 6
-    mock_burn_captions.assert_called_once()
-    assert mock_run.call_count >= 2  # concat + merge
+    mock_burn_captions.assert_not_called()
+    assert mock_run.call_count >= 3  # concat + merge + remux final
+    final_remux_args = mock_run.call_args[0][0]
+    assert final_remux_args[:2] == ["ffmpeg", "-y"]
+    assert "-c" in final_remux_args
+    assert "copy" in final_remux_args
+    assert final_remux_args[-1] == str(output.resolve())
 
 
 @patch("repo_to_shorts.hermes_skill.subprocess.run")
