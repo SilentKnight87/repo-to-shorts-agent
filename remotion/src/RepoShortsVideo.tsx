@@ -211,7 +211,6 @@ export const RepoShortsVideo: React.FC<RepoShortsManifest> = (props) => {
 
   return (
     <AbsoluteFill style={baseFill}>
-      <Backplate manifest={manifest} />
       {manifest.scenes.map((scene, index) => {
         const duration = getSceneDurationInFrames(scene, fps);
         const sequence = (
@@ -243,6 +242,7 @@ const SceneFrame: React.FC<{
   const isKnownSceneType = KNOWN_SCENE_TYPES.has(scene.type);
   const typeName = scene.type;
   const frame = useCurrentFrame();
+  const sceneProgress = Math.min(1, Math.max(0, frame / Math.max(1, durationInFrames - 1)));
   const entrance = spring({frame, fps: 30, config: {damping: 18, stiffness: 130}});
   const exit = interpolate(
     frame,
@@ -252,10 +252,20 @@ const SceneFrame: React.FC<{
   );
   const opacity = Math.min(entrance, exit);
   const y = interpolate(entrance, [0, 1], [34, 0]);
+  const stageOffsetX = interpolate(sceneProgress, [0, 1], [sceneIndex % 2 === 0 ? -26 : 26, 0], {
+    extrapolateRight: 'clamp',
+    easing: Easing.out(Easing.quad),
+  });
 
   return (
     <AbsoluteFill style={{opacity}}>
-      <div style={{...safeArea, transform: `translateY(${y}px)`}}>
+      <Backplate manifest={manifest} scene={scene} frame={frame} sceneProgress={sceneProgress} />
+      <div
+        style={{
+          ...safeArea,
+          transform: `translate(${stageOffsetX}px, ${y}px)`,
+        }}
+      >
         <SceneChrome
           scene={scene}
           manifest={manifest}
@@ -271,7 +281,7 @@ const SceneFrame: React.FC<{
         {typeName === 'DemoPreview' && <DemoPreview manifest={manifest} scene={scene} />}
         {typeName === 'CTAEndCard' && <CTAEndCard manifest={manifest} scene={scene} />}
         {!isKnownSceneType && <UnknownScene manifest={manifest} scene={scene} />}
-        <CaptionLine scene={scene} />
+        <CaptionLine scene={scene} manifest={manifest} frame={frame} sceneProgress={sceneProgress} />
       </div>
     </AbsoluteFill>
   );
@@ -344,6 +354,15 @@ const ColdOpen: React.FC<SceneProps> = ({manifest, scene}) => {
   const frame = useCurrentFrame();
   const reveal = spring({frame, fps: 30, config: {damping: 16, stiffness: 120}});
   const scan = interpolate(frame, [0, 90], [-220, 660], {extrapolateRight: 'extend'});
+  const pulse = interpolate(frame, [0, 18, 30], [0.94, 1, 0.94], {
+    easing: Easing.inOut(Easing.sin),
+    extrapolateRight: 'clamp',
+  });
+  const headlineWords = splitHeadline(scene.headline, 3);
+  const accent = interpolate(frame, [0, 24, 40], [0, 1, 0.66], {
+    easing: Easing.out(Easing.quad),
+    extrapolateRight: 'clamp',
+  });
 
   return (
     <main style={{position: 'absolute', inset: '156px 36px 140px 0'}}>
@@ -358,15 +377,37 @@ const ColdOpen: React.FC<SceneProps> = ({manifest, scene}) => {
           transform: `scale(${0.92 + reveal * 0.08})`,
         }}
       >
-        {splitHeadline(scene.headline, 4).map((part, index) => (
-          <div key={part} style={{color: index % 2 === 0 ? colors.paper : colors.cyan}}>
+        {headlineWords.map((part, index) => (
+          <div
+            key={part}
+            style={{
+              color: index % 2 === 0 ? colors.paper : colors.cyan,
+              transform: `translateX(${(index % 2 === 0 ? -1 : 1) * (1 - accent) * 20}px)`,
+              opacity: 0.6 + accent * 0.4,
+            }}
+          >
             {part}
           </div>
         ))}
       </div>
       <div
         style={{
-          marginTop: 64,
+          position: 'absolute',
+          left: 0,
+          right: 0,
+          top: 460,
+          fontFamily: type.mono,
+          fontSize: 30,
+          color: colors.paperDim,
+          letterSpacing: 1.1,
+          opacity: accent,
+        }}
+      >
+        {manifest.repo.description}
+      </div>
+      <div
+        style={{
+          marginTop: 84,
           display: 'inline-flex',
           border: `1px solid ${colors.cyan}`,
           boxShadow: shadows.glowCyan,
@@ -375,6 +416,7 @@ const ColdOpen: React.FC<SceneProps> = ({manifest, scene}) => {
           fontSize: 34,
           color: colors.green,
           background: colors.panel,
+          transform: `scale(${0.98 + pulse * 0.03})`,
         }}
       >
         {manifest.repo.name}
@@ -423,10 +465,33 @@ const PainPoint: React.FC<SceneProps> = ({scene}) => {
 };
 
 const PipelineMap: React.FC<{scene: Required<RepoShortsScene>}> = ({scene}) => {
+  const frame = useCurrentFrame();
+  const progress = Math.min(1, frame / 120);
   const steps = ['ingest', 'Kimi critic', 'storyboard', 'render', 'submission'];
   return (
     <FullStage headline={scene.headline} kicker="pipeline">
-      <div style={{display: 'grid', gridTemplateRows: `repeat(${steps.length}, 1fr)`, gap: 22}}>
+      <div
+        style={{
+          position: 'relative',
+          height: 920,
+          border: `1px solid ${colors.line}`,
+          padding: 24,
+          background: `linear-gradient(180deg, ${colors.panel} 0%, transparent 70%)`,
+          boxShadow: shadows.panel,
+        }}
+      >
+        <div
+          style={{
+            position: 'absolute',
+            left: 132,
+            top: 24,
+            width: 4,
+            height: 'calc(100% - 48px)',
+            background: `linear-gradient(180deg, transparent, ${colors.green}, transparent)`,
+            transform: `scaleY(${progress})`,
+            transformOrigin: 'top',
+          }}
+        />
         {steps.map((step, index) => (
           <div
             key={step}
@@ -435,6 +500,17 @@ const PipelineMap: React.FC<{scene: Required<RepoShortsScene>}> = ({scene}) => {
               gridTemplateColumns: '132px 1fr',
               alignItems: 'center',
               minHeight: 138,
+              transform: `translateX(${interpolate(
+                Math.min(1, Math.max(0, progress * steps.length - index)),
+                [0, 1],
+                [40, 0],
+              )}px)`,
+              opacity: interpolate(
+                Math.min(1, Math.max(0, progress * steps.length - index)),
+                [0, 0.25, 1],
+                [0.15, 1, 1],
+                {extrapolateRight: 'clamp'},
+              ),
             }}
           >
             <div style={{fontFamily: type.mono, fontSize: 34, color: colors.amber}}>
@@ -442,12 +518,15 @@ const PipelineMap: React.FC<{scene: Required<RepoShortsScene>}> = ({scene}) => {
             </div>
             <div
               style={{
-                borderLeft: `8px solid ${index === 1 ? colors.green : colors.cyan}`,
+                borderLeft: `8px solid ${
+                  index <= Math.floor(progress * steps.length) ? colors.green : colors.cyan
+                }`,
                 paddingLeft: 32,
                 fontFamily: type.display,
                 fontSize: 72,
                 lineHeight: 1,
                 textTransform: 'uppercase',
+                color: index <= Math.floor(progress * steps.length) ? colors.paper : colors.paperDim,
               }}
             >
               {step}
@@ -501,7 +580,7 @@ const LiveProof: React.FC<SceneProps> = ({manifest, scene}) => {
       headline={scene.headline}
       kicker="metadata proof"
       left={<ProofPanel rows={proofRows} />}
-      right={<TerminalPanel lines={['metadata.json', ...proofRows.map(([key, value]) => `${key}: ${value}`)]} />}
+      right={<ProofScroll rows={proofRows} manifest={manifest} />}
     />
   );
 };
@@ -517,33 +596,79 @@ const DemoPreview: React.FC<SceneProps> = ({manifest, scene}) => (
 
 const CTAEndCard: React.FC<SceneProps> = ({manifest, scene}) => (
   <FullStage headline={scene.headline} kicker="ship package">
+    <TypeWriterLine
+      lines={[
+        '$ repo-shorts analyze . --audience \"Nous Research Hermes Agent Creative Hackathon judges\" --final',
+        '$ repo-shorts creative . --audience \"Nous Research Hermes Agent Creative Hackathon judges\" --out runs --final',
+      ]}
+      y={0}
+    />
     <div
       style={{
-        marginTop: 70,
-        border: `1px solid ${colors.green}`,
-        background: '#050805',
-        boxShadow: shadows.glowCyan,
-        padding: 34,
-        fontFamily: type.mono,
-        fontSize: 34,
-        lineHeight: 1.35,
-        color: colors.green,
+        marginTop: 36,
+        display: 'grid',
+        gap: 28,
+        gridTemplateColumns: '1fr 1fr',
       }}
     >
-      <span style={{color: colors.paperDim}}>$ </span>
-      repo-shorts analyze . --render mp4
+      <div
+        style={{
+          border: `1px solid ${colors.green}`,
+          background: '#050805',
+          boxShadow: shadows.glowCyan,
+          padding: 34,
+          fontFamily: type.mono,
+          fontSize: 34,
+          lineHeight: 1.35,
+          color: colors.green,
+          minHeight: 220,
+        }}
+      >
+        <span style={{color: colors.paperDim}}>$ </span>
+        OPENAI_API_KEY=***
+      </div>
+      <div
+        style={{
+          border: `1px solid ${colors.green}`,
+          background: '#050805',
+          boxShadow: shadows.glowCyan,
+          padding: 34,
+          fontFamily: type.mono,
+          fontSize: 34,
+          lineHeight: 1.35,
+          color: colors.cyan,
+          minHeight: 220,
+        }}
+      >
+        <span style={{color: colors.paperDim}}>$ </span>
+        OPENROUTER_API_KEY=***
+      </div>
     </div>
     <div
       style={{
         marginTop: 70,
-        fontFamily: type.display,
-        fontSize: 84,
-        lineHeight: 1,
-        color: colors.cyan,
-        textTransform: 'uppercase',
+        border: `1px solid ${colors.green}`,
+        boxShadow: shadows.glowCyan,
+        padding: 34,
+        display: 'grid',
+        gridTemplateColumns: '1fr 1fr',
+        gap: 20,
+        color: colors.green,
+        fontFamily: type.mono,
+        fontSize: 26,
+        background: 'rgba(0, 0, 0, 0.5)',
       }}
     >
-      {manifest.artifacts.slice(0, 4).join(' / ')}
+      <div>
+        Output folder:
+        <br />
+        <span style={{color: colors.paper}}>{manifest.repo.name}/runs</span>
+      </div>
+      <div style={{textAlign: 'right'}}>
+        FPS:
+        <br />
+        <span style={{color: colors.paper}}>{manifest.video.fps}</span>
+      </div>
     </div>
   </FullStage>
 );
@@ -748,6 +873,73 @@ const ProofPanel: React.FC<{rows: [string, unknown][]}> = ({rows}) => (
   </div>
 );
 
+const ProofScroll: React.FC<{
+  rows: [string, unknown][];
+  manifest: NormalizedManifest;
+}> = ({rows, manifest}) => {
+  const frame = useCurrentFrame();
+  const slide = interpolate(frame, [0, 20], [0, 1], {extrapolateRight: 'clamp'});
+  return (
+    <div style={{display: 'grid', gap: 18}}>
+      <TerminalPanel lines={['metadata.json']} />
+      {rows.map(([key, value], index) => (
+        <div
+          key={key}
+          style={{
+            borderLeft: `6px solid ${index % 2 === 0 ? colors.green : colors.cyan}`,
+            paddingLeft: 16,
+            transform: `translateY(${(1 - slide) * 18}px)`,
+            opacity: slide,
+          }}
+        >
+          <div style={{color: colors.paperDim, fontFamily: type.mono, fontSize: 18}}>{key}</div>
+          <div
+            style={{
+              color: colors.paper,
+              fontFamily: type.mono,
+              fontSize: 32,
+              wordBreak: 'break-word',
+            }}
+          >
+            {String(value)}
+          </div>
+          <div style={{marginTop: 6, color: colors.paperDim, fontSize: 19, fontFamily: type.body}}>
+            run folder: /tmp/{manifest.repo.name}/runs
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+};
+
+const TypeWriterLine: React.FC<{lines: string[]; y?: number}> = ({lines, y = 160}) => {
+  const frame = useCurrentFrame();
+  const line1 = lines[0] ?? '';
+  const line2 = lines[1] ?? '';
+  const charsA = Math.min(line1.length, Math.floor(frame / 2));
+  const charsB = Math.max(0, Math.min(line2.length, Math.floor((frame - 120) / 2)));
+  return (
+    <div style={{position: 'absolute', left: 0, right: 60, top: y}}>
+      <div
+        style={{
+          fontFamily: type.mono,
+          fontSize: 30,
+          lineHeight: 1.4,
+          color: colors.paperDim,
+          marginBottom: 18,
+        }}
+      >
+        <span style={{color: colors.cyan}}>$ </span>
+        {line1.slice(0, charsA)}
+      </div>
+      <div style={{fontFamily: type.mono, fontSize: 30, lineHeight: 1.4, color: colors.paperDim}}>
+        <span style={{color: colors.cyan}}>$ </span>
+        {line2.slice(0, Math.max(0, charsB))}
+      </div>
+    </div>
+  );
+};
+
 const PhonePreview: React.FC<{manifest: NormalizedManifest}> = ({manifest}) => (
   <div
     style={{
@@ -780,28 +972,49 @@ const PhonePreview: React.FC<{manifest: NormalizedManifest}> = ({manifest}) => (
   </div>
 );
 
-const CaptionLine: React.FC<{scene: Required<RepoShortsScene>}> = ({scene}) => {
+const CaptionLine: React.FC<{
+  manifest: NormalizedManifest;
+  scene: Required<RepoShortsScene>;
+  frame: number;
+  sceneProgress: number;
+}> = ({manifest, scene, frame, sceneProgress}) => {
   const text = scene.caption_emphasis.length
     ? scene.caption_emphasis.join('  /  ')
     : scene.narration;
+  const anchor = scene.type === 'ColdOpen' ? 'upper' : 'mid';
+  const drift = interpolate(sceneProgress, [0, 1], [40, 0], {extrapolateRight: 'clamp'});
+  const reveal = interpolate(frame, [0, 12, 30], [0, 1, 1], {
+    easing: Easing.out(Easing.quad),
+    extrapolateRight: 'clamp',
+  });
+  const label = manifest.repo.name;
   return (
     <div
       style={{
         position: 'absolute',
-        left: 0,
+        left: anchor === 'upper' ? 0 : 52,
         right: 76,
-        bottom: 48,
+        [anchor === 'upper' ? 'top' : 'bottom']: anchor === 'upper' ? 128 + drift : 48,
         display: 'flex',
         alignItems: 'center',
         gap: 18,
         color: colors.paper,
+        opacity: reveal,
+        transform: `translateX(${drift}px)`,
       }}
     >
-      <div style={{width: 58, height: 5, background: colors.red}} />
+      <div
+        style={{
+          width: 58,
+          height: 5,
+          background: colors.red,
+          opacity: anchor === 'upper' ? 0.8 : 1,
+        }}
+      />
       <div
         style={{
           fontFamily: type.mono,
-          fontSize: 30,
+          fontSize: anchor === 'upper' ? 26 : 30,
           lineHeight: 1.18,
           textTransform: 'uppercase',
           color: colors.paper,
@@ -809,22 +1022,53 @@ const CaptionLine: React.FC<{scene: Required<RepoShortsScene>}> = ({scene}) => {
       >
         {text}
       </div>
+      <div
+        style={{
+          marginLeft: 'auto',
+          fontFamily: type.mono,
+          fontSize: 20,
+          color: colors.paperDim,
+          opacity: 0.75,
+        }}
+      >
+        {label}
+      </div>
     </div>
   );
 };
 
-const Backplate: React.FC<{manifest: NormalizedManifest}> = ({manifest}) => {
-  const frame = useCurrentFrame();
+const Backplate: React.FC<{
+  manifest: NormalizedManifest;
+  scene: Required<RepoShortsScene>;
+  frame: number;
+  sceneProgress: number;
+}> = ({manifest, scene, frame, sceneProgress}) => {
   const sweep = interpolate(frame % 180, [0, 180], [-260, 1220]);
+  const hue =
+    scene.type === 'ColdOpen'
+      ? colors.cyan
+      : scene.type === 'PipelineMap'
+        ? colors.green
+        : scene.type === 'LiveProof'
+          ? colors.amber
+          : colors.ghost;
+  const bgShift = interpolate(sceneProgress, [0, 1], [-20, 20], {extrapolateRight: 'clamp'});
+  const sceneGradient =
+    scene.type === 'ColdOpen'
+      ? `linear-gradient(160deg, ${colors.carbon} 0%, #0c1736 45%, #0f1019 100%)`
+      : scene.type === 'PipelineMap'
+        ? `linear-gradient(160deg, #0f1927 0%, #121620 52%, ${colors.ink} 100%)`
+        : scene.type === 'LiveProof'
+          ? `linear-gradient(160deg, #13140e 0%, #1a2715 58%, ${colors.ink} 100%)`
+          : `linear-gradient(135deg, ${colors.carbon} 0%, #111820 46%, #12100a 100%)`;
+  const sideBand = scene.type === 'CTAEndCard' ? 0 : 52;
   return (
-    <AbsoluteFill>
+    <AbsoluteFill style={{transform: `translateX(${bgShift}px)`}}>
       <div
         style={{
           position: 'absolute',
           inset: 0,
-          background:
-            `linear-gradient(135deg, ${colors.carbon} 0%, #111820 46%, #12100a 100%), ` +
-            `repeating-linear-gradient(0deg, transparent 0, transparent 17px, ${colors.ghost} 18px)`,
+          background: `${sceneGradient}, repeating-linear-gradient(0deg, transparent 0, transparent 17px, ${colors.ghost} 18px)`,
         }}
       />
       <div
@@ -835,7 +1079,9 @@ const Backplate: React.FC<{manifest: NormalizedManifest}> = ({manifest}) => {
           width: 880,
           height: 1220,
           border: `1px solid ${colors.line}`,
-          transform: 'skewY(-4deg)',
+          transform: `skewY(-4deg) rotate(${interpolate(sceneProgress, [0, 1], [2, -2], {
+            extrapolateRight: 'clamp',
+          })}deg)`,
         }}
       />
       <div
@@ -845,14 +1091,15 @@ const Backplate: React.FC<{manifest: NormalizedManifest}> = ({manifest}) => {
           top: 0,
           width: 180,
           height: '100%',
-          background: `linear-gradient(90deg, transparent, ${colors.cyan}17, transparent)`,
+          background: `linear-gradient(90deg, transparent, ${hue}22, transparent)`,
           transform: 'skewX(-12deg)',
+          opacity: interpolate(sceneProgress, [0, 1], [0.22, 0.52]),
         }}
       />
       <div
         style={{
           position: 'absolute',
-          left: spacing.pageX,
+          left: sideBand || spacing.pageX,
           bottom: 40,
           fontFamily: type.mono,
           color: colors.ghost,
@@ -861,6 +1108,20 @@ const Backplate: React.FC<{manifest: NormalizedManifest}> = ({manifest}) => {
         }}
       >
         {manifest.video.width}x{manifest.video.height} / {manifest.video.fps}fps
+      </div>
+      <div
+        style={{
+          position: 'absolute',
+          right: sideBand,
+          top: 40,
+          fontFamily: type.mono,
+          color: colors.paperDim,
+          fontSize: 20,
+          opacity: 0.8,
+          textTransform: 'uppercase',
+        }}
+      >
+        {scene.type}
       </div>
     </AbsoluteFill>
   );

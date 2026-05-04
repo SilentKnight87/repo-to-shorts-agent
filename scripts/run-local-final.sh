@@ -58,7 +58,7 @@ echo "Submission pack: $run_dir/submission_pack.md"
 
 if command -v jq >/dev/null 2>&1 && [[ -f "$run_dir/metadata.json" ]]; then
   echo
-  jq '{kimi: .kimi, tts: .tts, validation: .render.validation}' "$run_dir/metadata.json"
+  jq '{kimi: .kimi, tts: .tts, render: .render, validation: .render.validation}' "$run_dir/metadata.json"
 
   kimi_mode="$(jq -r '.kimi.mode // ""' "$run_dir/metadata.json")"
   if [[ "$REQUIRE_LIVE_KIMI" == "1" && "$kimi_mode" != "live-api" ]]; then
@@ -71,6 +71,12 @@ elif [[ "$REQUIRE_LIVE_KIMI" == "1" ]]; then
   echo "This runner requires live Kimi validation, but jq or metadata.json is unavailable." >&2
   echo "Run preserved for debugging: $run_dir" >&2
   exit 2
+fi
+
+if command -v ffmpeg >/dev/null 2>&1 && [[ -f "$run_dir/demo.mp4" ]]; then
+  if ffmpeg -y -i "$run_dir/demo.mp4" -vf "fps=1/7,scale=270:-1,tile=3x3" -frames:v 1 "$run_dir/contact_sheet.jpg" >/dev/null 2>&1; then
+    echo "Contact sheet: $run_dir/contact_sheet.jpg"
+  fi
 fi
 
 if [[ "${OPEN_VIDEO:-1}" == "1" && -f "$run_dir/demo.mp4" ]]; then

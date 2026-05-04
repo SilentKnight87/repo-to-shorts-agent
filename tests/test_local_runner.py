@@ -22,3 +22,6 @@ def test_local_final_runner_is_executable_and_pins_default_workflow():
     assert 'REQUIRE_LIVE_KIMI="${REQUIRE_LIVE_KIMI:-1}"' in text
     assert '.kimi.mode // ""' in text
     assert "requires live Kimi" in text
+    assert "render: .render" in text
+    assert "ffmpeg -y -i \"$run_dir/demo.mp4\"" in text
+    assert "contact_sheet.jpg" in text
