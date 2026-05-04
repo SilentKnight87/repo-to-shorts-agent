@@ -12,4 +12,6 @@ build/
 !.env.example
 .superpowers/
 .worktrees/
+.claude/
+node_modules/
 tweets-draft.md
