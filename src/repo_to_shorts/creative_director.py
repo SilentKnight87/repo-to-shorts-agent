@@ -92,8 +92,11 @@ Creative rules:
 - For this app specifically, emphasize the meta demo: the app generates the video that presents the app.
 """
     if final:
-        prompt = f"""You are an elite creative director making a hackathon demo video that must feel like Runway/Linear, not a generated slideshow.
-Your job is to convert code evidence into a sharp 45-60 second vertical short with a real point of view.
+        prompt = f"""You are an elite creative director making a 45-60 second 9:16 vertical short for the Nous Research Hermes Agent Creative Hackathon.
+
+The submission video runs as a SILENT VIDEO with cinematic 80s synthwave music underneath. There is NO voiceover. The visuals must carry the entire story. Headlines on screen, kinetic typography, repo evidence — these are the storytelling tools. Treat narration as optional flavor that informs caption emphasis, not as a script that will be spoken.
+
+The aesthetic is retro VHS broadcast deck — same energy as the project's web UI: tape labels, channel chyrons, scanlines, REC/STBY/LIVE indicators, SMPTE color bars, glitch headlines, JetBrains Mono and Avenir Next Condensed type. Stranger Things meets Drive soundtrack. Blade Runner 2049 cinematography. Builder-focused, never corporate.
 
 REPO: {analysis.get('repo_name')}
 DESCRIPTION: {analysis.get('description', '')}
@@ -107,9 +110,9 @@ Output valid JSON only as a root object with this exact schema:
 {{
   "schema_version": 1,
   "creative_direction": {{
-    "angle": "meta demo",
-    "tone": "sharp, cinematic, builder-focused",
-    "visual_style": "retro-futuristic editorial"
+    "angle": "the repo making the video about itself, retro VHS broadcast feel",
+    "tone": "wordless VHS broadcast — late-80s news graphics meet cinematic synthwave intro",
+    "visual_style": "retro VHS broadcast deck — tape labels, channel chyrons, REC/LIVE/STBY indicators, SMPTE color-bar pacing, kinetic editorial type, Carpenter/Drive/Stranger Things"
   }},
   "storyboard": [
     {{
@@ -149,6 +152,38 @@ Final export constraints:
 - Every scene must have one primary visual idea.
 - Every claim must connect to repo evidence, generated artifact evidence, or metadata proof.
 - Do not make generic architecture slides, floating cards for their own sake, dark blob backgrounds, or repeated architecture slides.
+
+Music-driven scene timing — CRITICAL:
+- The video plays underneath an 80s cinematic synthwave track at ~95 BPM. 4 bars ≈ 10 seconds, 2 bars ≈ 5 seconds, 8 bars ≈ 20 seconds.
+- Choose scene durations from this list, in this priority: 5s, 10s, 7.5s, 4s, 8s, 12s. Avoid odd values like 7s, 9s, 11s — they feel out of phase with the music.
+- The total duration must still land in 45-60s. A typical layout: 5 + 10 + 7.5 + 10 + 7.5 + 5 + 5 = 50s.
+- The first scene (ColdOpen) should be 4-5s — punchy hook on the first downbeat.
+- The last scene (CTAEndCard) should be 5s — clean exit on a bar boundary.
+
+Headlines — CRITICAL:
+- Each scene's `headline` is the primary visual element. Make it READ like a VHS broadcast chyron: 5-9 words, declarative, present tense, no marketing words.
+- Use mono-uppercase-friendly phrases: "DEMO VIDEOS EAT 6 HOURS", "KIMI READS THE REPO", "PROOF IS IN METADATA.JSON", "SHIP THE SHORT".
+- Headlines must connect to repo evidence in the same scene's `evidence` field.
+
+Narration is optional flavor (the video is silent):
+- You may write narration text — it's used for caption emphasis and submission copy — but assume nobody hears it.
+- Keep narration to 1 sentence per scene, 8-15 words. Don't pad.
+- The video story is told entirely through headlines + evidence + scene types + the music's natural arc.
+
+Storyboard arc:
+1. Hook (ColdOpen, 4-5s) — meta-claim about the repo making this video
+2. Pain (PainPoint or RepoEvidence, 5-10s) — what's broken about demo videos today
+3. Mechanism (PipelineMap, 7.5-10s) — the workflow as a flow chart
+4. Proof (LiveProof, 5-7.5s) — metadata.json with kimi.mode=live-api highlighted
+5. Artifacts (ArtifactStack or DemoPreview, 5-7.5s) — what comes out of the box
+6. CTA (CTAEndCard, 5s) — command line + GitHub URL
+
+Anti-patterns — never produce these:
+- Generic architecture diagrams with floating boxes
+- Bottom caption boxes that repeat across scenes
+- Bokeh / dark blob backgrounds
+- Marketing words (optimize, leverage, seamless, robust, game-changing, unleash, supercharge)
+- Vague pain ("demo videos are hard") — use specifics ("6 hours screen-recording slides")
 """
     return prompt
 
