@@ -63,9 +63,45 @@ def creative(
     music: Path | None = typer.Option(None, "--music", help="Optional background music MP3 file."),
     preview: bool = typer.Option(False, "--preview", help="Fast 12-15s preview render for iteration."),
     skip_audio: bool = typer.Option(False, "--skip-audio", help="Skip TTS/music composition for fastest visual iteration."),
+    final: bool = typer.Option(False, "--final", help="Run submission-grade final export with validation."),
+    tts_provider: str = typer.Option("edge", "--tts-provider", help="TTS provider: xai, openai, edge, or none."),
+    fallback_tts_provider: str | None = typer.Option(
+        None,
+        "--fallback-tts-provider",
+        help="Fallback TTS provider (--fallback-tts-provider).",
+    ),
+    voice: str | None = typer.Option(None, "--voice", help="Provider-specific voice id."),
+    generated_music: bool = typer.Option(
+        True,
+        "--generated-music/--no-generated-music",
+        help="Generate ambient music when no --music is supplied.",
+    ),
 ) -> None:
-    """Generate a creative short video with Kimi 2.6 creative direction."""
+    """Generate a creative short video with Kimi 2.6 creative direction.
+
+    Final export options include --final, --tts-provider, --fallback-tts-provider,
+    --voice, and --no-generated-music.
+    """
     from repo_to_shorts.hermes_skill import run_creative_pipeline
+
+    command = ["repo-shorts", "creative", target, "--audience", audience, "--out", str(out)]
+    if kimi_model:
+        command.extend(["--kimi-model", kimi_model])
+    if music is not None:
+        command.extend(["--music", str(music)])
+    if preview:
+        command.append("--preview")
+    if skip_audio:
+        command.append("--skip-audio")
+    if final:
+        command.append("--final")
+    command.extend(["--tts-provider", tts_provider])
+    if fallback_tts_provider:
+        command.extend(["--fallback-tts-provider", fallback_tts_provider])
+    if voice:
+        command.extend(["--voice", voice])
+    if not generated_music:
+        command.append("--no-generated-music")
 
     try:
         result = run_creative_pipeline(
@@ -76,6 +112,12 @@ def creative(
             music_path=music,
             preview=preview,
             skip_audio=skip_audio,
+            final=final,
+            tts_provider=tts_provider,
+            fallback_tts_provider=fallback_tts_provider,
+            voice=voice,
+            generated_music=generated_music,
+            command=command,
         )
     except Exception as exc:  # noqa: BLE001
         raise typer.BadParameter(str(exc)) from exc

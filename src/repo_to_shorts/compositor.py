@@ -1,8 +1,12 @@
 from __future__ import annotations
 
+import json
+import os
 import subprocess
 import tempfile
+import urllib.request
 from pathlib import Path
+from typing import Callable
 
 EDGE_TTS_VOICE = "en-US-AvaMultilingualNeural"
 EDGE_TTS_RATE = "+8%"
@@ -120,49 +124,50 @@ def _stitch_scenes(scene_paths: list[Path], output_path: Path) -> None:
     subprocess.run(cmd, check=True, capture_output=True, text=True)
 
 
-def generate_tts(text: str, output_path: Path, *, allow_say_fallback: bool = False) -> Path:
-    """Generate TTS audio using Edge neural voice by default.
+def generate_tts(
+    text: str,
+    output_path: Path,
+    *,
+    provider: str = "edge",
+    fallback_provider: str | None = None,
+    voice: str | None = None,
+    allow_say_fallback: bool = False,
+    provider_report: Callable[[str], None] | None = None,
+) -> Path:
+    """Generate TTS audio using the selected provider.
 
     Creative/postable renders should fail loudly if Edge TTS is unavailable instead
     of silently degrading to macOS ``say``. ``allow_say_fallback`` exists only for
     explicit local/offline use.
     """
+    if provider == "none":
+        raise RuntimeError("TTS provider is none; skip audio composition instead")
+
     output_path = output_path.resolve()
     with tempfile.TemporaryDirectory() as tmpdir_str:
         tmpdir = Path(tmpdir_str)
-        mp3_path = tmpdir / "tts.mp3"
-
-        # Try edge-tts first for neural voice quality.
         try:
-            cmd = [
-                "edge-tts",
-                "--voice",
-                EDGE_TTS_VOICE,
-                "--rate",
-                EDGE_TTS_RATE,
-                "--pitch",
-                EDGE_TTS_PITCH,
-                "--volume",
-                EDGE_TTS_VOLUME,
-                "--text",
-                text,
-                "--write-media",
-                str(mp3_path.resolve()),
-            ]
-            subprocess.run(cmd, check=True, capture_output=True, text=True)
-            source_path = mp3_path
-        except (subprocess.CalledProcessError, FileNotFoundError) as exc:
-            if not allow_say_fallback:
+            source_path = _generate_tts_source(text, tmpdir / "tts", provider, voice, allow_say_fallback)
+            used_provider = provider
+        except Exception:
+            if not fallback_provider or fallback_provider == "none":
+                raise
+            try:
+                source_path = _generate_tts_source(
+                    text,
+                    tmpdir / "tts_fallback",
+                    fallback_provider,
+                    voice,
+                    allow_say_fallback,
+                )
+                used_provider = fallback_provider
+            except Exception as fallback_exc:
                 raise RuntimeError(
-                    "Edge TTS failed; install/configure edge-tts or pass "
-                    "allow_say_fallback=True for non-postable local drafts."
-                ) from exc
-
-            # Explicit opt-in fallback only; never silently degrade creative renders.
-            aiff_path = tmpdir / "tts.aiff"
-            cmd_say = ["say", "-o", str(aiff_path.resolve()), text]
-            subprocess.run(cmd_say, check=True, capture_output=True, text=True)
-            source_path = aiff_path
+                    f"TTS provider {provider!r} failed, and fallback provider "
+                    f"{fallback_provider!r} also failed."
+                ) from fallback_exc
+        if provider_report is not None:
+            provider_report(used_provider)
 
         cmd_ffmpeg = [
             "ffmpeg",
@@ -177,6 +182,93 @@ def generate_tts(text: str, output_path: Path, *, allow_say_fallback: bool = Fal
         ]
         subprocess.run(cmd_ffmpeg, check=True, capture_output=True, text=True)
     return output_path
+
+
+def _generate_tts_source(
+    text: str,
+    output_path: Path,
+    provider: str,
+    voice: str | None,
+    allow_say_fallback: bool,
+) -> Path:
+    if provider == "xai":
+        return _generate_xai_tts(text, output_path, voice)
+    if provider == "openai":
+        return _generate_openai_tts(text, output_path, voice)
+    if provider == "edge":
+        return _generate_edge_tts(text, output_path, voice, allow_say_fallback)
+    if provider == "none":
+        raise RuntimeError("TTS provider is none; skip audio composition instead")
+    raise RuntimeError(f"Unsupported TTS provider: {provider}")
+
+
+def _generate_xai_tts(text: str, output_path: Path, voice: str | None) -> Path:
+    try:
+        api_key = os.environ["XAI_API_KEY"]
+    except KeyError as exc:
+        raise RuntimeError("XAI_API_KEY is required for xai TTS provider") from exc
+
+    url = "https://api.x.ai/v1/tts"
+    payload = {"text": text, "voice_id": voice or "eve", "language": "en"}
+    headers = {"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"}
+    return _request_tts_mp3(url, payload, headers, output_path)
+
+
+def _generate_openai_tts(text: str, output_path: Path, voice: str | None) -> Path:
+    try:
+        api_key = os.environ["OPENAI_API_KEY"]
+    except KeyError as exc:
+        raise RuntimeError("OPENAI_API_KEY is required for openai TTS provider") from exc
+
+    url = "https://api.openai.com/v1/audio/speech"
+    payload = {"model": "gpt-4o-mini-tts", "input": text, "voice": voice or "alloy", "response_format": "mp3"}
+    headers = {"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"}
+    return _request_tts_mp3(url, payload, headers, output_path)
+
+
+def _generate_edge_tts(text: str, output_path: Path, voice: str | None, allow_say_fallback: bool) -> Path:
+    mp3_path = output_path.with_suffix(".mp3").resolve()
+
+    # Try edge-tts first for neural voice quality.
+    try:
+        cmd = [
+            "edge-tts",
+            "--voice",
+            voice or EDGE_TTS_VOICE,
+            "--rate",
+            EDGE_TTS_RATE,
+            "--pitch",
+            EDGE_TTS_PITCH,
+            "--volume",
+            EDGE_TTS_VOLUME,
+            "--text",
+            text,
+            "--write-media",
+            str(mp3_path),
+        ]
+        subprocess.run(cmd, check=True, capture_output=True, text=True)
+        return mp3_path
+    except (subprocess.CalledProcessError, FileNotFoundError) as exc:
+        if not allow_say_fallback:
+            raise RuntimeError(
+                "Edge TTS failed; install/configure edge-tts or pass "
+                "allow_say_fallback=True for non-postable local drafts."
+            ) from exc
+
+        # Explicit opt-in fallback only; never silently degrade creative renders.
+        aiff_path = output_path.with_suffix(".aiff").resolve()
+        cmd_say = ["say", "-o", str(aiff_path), text]
+        subprocess.run(cmd_say, check=True, capture_output=True, text=True)
+        return aiff_path
+
+
+def _request_tts_mp3(url: str, payload: dict[str, str], headers: dict[str, str], output_path: Path) -> Path:
+    mp3_path = output_path.with_suffix(".mp3").resolve()
+    data = json.dumps(payload).encode("utf-8")
+    request = urllib.request.Request(url, data=data, headers=headers, method="POST")
+    with urllib.request.urlopen(request, timeout=60) as response:
+        mp3_path.write_bytes(response.read())
+    return mp3_path
 
 
 def mix_audio(voice_path: Path, music_path: Path | None, output_path: Path, duration_seconds: int) -> Path:
@@ -240,7 +332,6 @@ def burn_karaoke_captions(video_path: Path, captions: list[dict], output_path: P
 
     filter_parts = []
     font_path = "/System/Library/Fonts/HelveticaNeue.ttc"
-    import os
     if not os.path.exists(font_path):
         font_path = "/System/Library/Fonts/Supplemental/Arial.ttf"
 

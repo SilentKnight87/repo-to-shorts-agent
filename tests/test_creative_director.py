@@ -4,6 +4,7 @@ import json
 
 from repo_to_shorts.creative_director import (
     CreativeBrief,
+    _build_director_prompt,
     _deterministic_fallback,
     _loads_brief_json,
     _parse_brief,
@@ -54,6 +55,10 @@ def test_direct_returns_valid_creative_brief_with_mocked_api(monkeypatch):
     assert result.scenes[0]["visual_tool"] == "manim"
     assert result.music_mood == "electronic"
     assert result.total_duration == 60
+    assert result.mode == "live-api"
+    assert result.provider == "openrouter"
+    assert result.model == "moonshotai/kimi-k2.6"
+    assert result.fallback_reason is None
     assert calls[0][1] == "moonshotai/kimi-k2.6"
     assert "my-repo" in calls[0][0]
 
@@ -77,6 +82,28 @@ def test_direct_fallback_when_no_api_key(monkeypatch):
     assert result.hook == "A codebase walks into a cinema."
     assert len(result.scenes) == 5
     assert result.total_duration == 60
+    assert result.mode == "deterministic-fallback"
+    assert result.provider == "openrouter"
+    assert result.model == "moonshotai/kimi-k2.6"
+    assert result.fallback_reason is None
+
+
+def test_final_director_prompt_requires_postable_duration_and_secret_filtering():
+    prompt = _build_director_prompt(
+        {
+            "repo_name": "repo-to-shorts",
+            "description": "Turns repos into shorts",
+            "key_files": ["src/app.py"],
+            "components": ["CLI"],
+        },
+        final=True,
+    )
+
+    assert "45-60 seconds" in prompt
+    assert "at least 5 scenes" in prompt
+    assert ".env" in prompt
+    assert "secret" in prompt.lower()
+    assert "concrete repo evidence" in prompt.lower()
 
 
 def test_parse_brief_handles_markdown_code_fences():
@@ -126,6 +153,34 @@ def test_direct_falls_back_when_model_returns_malformed_json(monkeypatch):
     result = direct({"repo_name": "bad-json-repo"})
     assert result.title == "bad-json-repo: The Repo That Edits Itself Into a Trailer"
     assert len(result.scenes) == 5
+    assert result.mode == "api-error-fallback"
+    assert result.provider == "openrouter"
+    assert result.model == "moonshotai/kimi-k2.6"
+    assert result.fallback_reason is not None
+    assert "Kimi API failed" in result.fallback_reason
+    assert "JSONDecodeError" in result.fallback_reason
+
+
+def test_direct_live_success_records_proof_fields(monkeypatch):
+    monkeypatch.setenv("OPENROUTER_API_KEY", "test-key")
+    monkeypatch.setattr(
+        "repo_to_shorts.creative_director._call_openrouter_api",
+        lambda *_: json.dumps({
+            "style": "cinematic",
+            "title": "Live Title",
+            "hook": "Live hook.",
+            "scenes": [{"duration_seconds": 12, "narration": "Scene."}],
+            "music_mood": "minimal",
+            "total_duration": 48,
+        }),
+    )
+
+    result = direct({"repo_name": "live-repo"}, model="moonshotai/custom")
+
+    assert result.mode == "live-api"
+    assert result.provider == "openrouter"
+    assert result.model == "moonshotai/custom"
+    assert result.fallback_reason is None
 
 
 def test_deterministic_fallback_returns_expected_structure():

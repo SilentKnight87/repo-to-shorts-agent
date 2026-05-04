@@ -6,11 +6,30 @@ import tempfile
 from datetime import datetime
 from pathlib import Path
 
-from repo_to_shorts.compositor import burn_karaoke_captions, generate_ambient_music, generate_tts, mix_audio
+from repo_to_shorts.compositor import generate_ambient_music, generate_tts, mix_audio
 from repo_to_shorts.creative_director import direct
 from repo_to_shorts.ingest import ingest_target
 from repo_to_shorts.manim_render import generate_manim_script, render_scene
+from repo_to_shorts.media_validation import validate_media
 from repo_to_shorts.progress import ProgressTracker
+from repo_to_shorts.submissions import write_submission_pack
+
+SAFE_FILE_PREFIXES = (
+    "src/",
+    "tests/",
+    "test/",
+    "docs/",
+    "app/",
+    "lib/",
+    "packages/",
+    "cmd/",
+    "internal/",
+    "web/",
+    "frontend/",
+    "backend/",
+)
+SAFE_FILE_NAMES = {"README.md", "pyproject.toml", "package.json", "Cargo.toml", "go.mod", "Dockerfile", "Makefile"}
+SECRET_FILE_MARKERS = (".env", "secret", "token", "private", "id_rsa", ".pem", ".key")
 
 
 def run_creative_pipeline(
@@ -22,13 +41,25 @@ def run_creative_pipeline(
     session_id: str | None = None,
     preview: bool = False,
     skip_audio: bool = False,
+    final: bool = False,
+    tts_provider: str = "edge",
+    fallback_tts_provider: str | None = None,
+    voice: str | None = None,
+    generated_music: bool = True,
+    command: list[str] | None = None,
 ) -> dict:
     """Full creative pipeline: ingest → Kimi creative director → render → compose.
 
     Returns {"output": str(final_mp4), "run_dir": str(run_dir)}
     """
+    if music_path is not None and not music_path.exists():
+        raise ValueError(f"Music file not found: {music_path}")
+
     if session_id:
         ProgressTracker.create_session(session_id)
+    if final:
+        preview = False
+        skip_audio = tts_provider == "none"
 
     def _start(stage: str, detail: str = "") -> None:
         if session_id:
@@ -52,10 +83,12 @@ def run_creative_pipeline(
         _complete("analyze", f"Analyzed {repo_analysis.get('repo_name', 'repo')}")
 
         _start("kimi_brief", "Calling creative director")
-        brief = direct(repo_analysis, model=kimi_model or "moonshotai/kimi-k2.6")
+        brief = direct(repo_analysis, model=kimi_model or "moonshotai/kimi-k2.6", final=final)
         if preview:
             brief.scenes = _preview_scenes(brief.scenes)
             brief.total_duration = int(sum(float(scene.get("duration_seconds", 4)) for scene in brief.scenes))
+        if final:
+            _validate_final_brief(brief)
         _complete("kimi_brief", f"Brief: {brief.title}")
 
         timestamp = datetime.now().strftime("%Y%m%d-%H%M%S")
@@ -76,18 +109,47 @@ def run_creative_pipeline(
             video_path = raw_video
         _complete("render_frames", f"Rendered {len(brief.scenes)} scenes")
 
+        captions_path = _write_captions_srt(brief.scenes, run_dir / "captions.srt")
+
         _start("tts", "Generating narration")
         final_video = run_dir / "demo.mp4"
+        actual_tts_provider = None
         if skip_audio:
             _copy_video(video_path, final_video)
         else:
-            _merge_creative_video(video_path, brief.scenes, final_video, music_path=music_path)
+            merge_result = _merge_creative_video(
+                video_path,
+                brief.scenes,
+                final_video,
+                music_path=music_path,
+                tts_provider=tts_provider,
+                fallback_tts_provider=fallback_tts_provider,
+                voice=voice,
+                generated_music=generated_music,
+            )
+            if isinstance(merge_result, dict):
+                actual_tts_provider = merge_result.get("actual_tts_provider")
+                final_video = Path(merge_result.get("output", final_video))
         _complete("tts", "Skipped audio for preview" if skip_audio else f"Generated voice for {len(brief.scenes)} scenes")
 
         _start("compose", "Mixing audio and video")
         _complete("compose", "Video composed")
 
+        validation = validate_media(final_video, require_audio=not skip_audio)
+        if final and not validation.get("ok"):
+            errors = validation.get("errors") or ["media validation failed"]
+            raise RuntimeError("; ".join(errors))
+
         _start("finalize", "Writing metadata")
+        kimi_metadata = {
+            "mode": _brief_text_attr(brief, "mode", "deterministic-fallback"),
+            "model": _brief_text_attr(brief, "model", kimi_model or "moonshotai/kimi-k2.6"),
+            "provider": _brief_text_attr(brief, "provider", "openrouter"),
+        }
+        fallback_reason = getattr(brief, "fallback_reason", None)
+        if isinstance(fallback_reason, str) and fallback_reason:
+            kimi_metadata["fallback_reason"] = fallback_reason
+
         metadata = {
             "target": target,
             "source_type": snapshot.source_type,
@@ -102,10 +164,13 @@ def run_creative_pipeline(
                 "music_mood": brief.music_mood,
                 "total_duration": brief.total_duration,
             },
-            "kimi": {
-                "mode": "live-api" if _has_api_key() else "deterministic-fallback",
-                "model": kimi_model or "moonshotai/kimi-k2.6",
-                "provider": "openrouter",
+            "kimi": kimi_metadata,
+            "tts": {
+                "provider": tts_provider,
+                "fallback_provider": fallback_tts_provider,
+                "actual_provider": actual_tts_provider,
+                "voice": voice,
+                "skipped": skip_audio,
             },
             "render": {
                 "mode": "mp4",
@@ -113,13 +178,27 @@ def run_creative_pipeline(
                 "output": "demo.mp4",
                 "scene_count": len(brief.scenes),
                 "preview": preview,
-                "audio": "skipped" if skip_audio else "tts+generated-music",
+                "audio": _render_audio_label(
+                    skip_audio=skip_audio,
+                    music_path=music_path,
+                    generated_music=generated_music,
+                ),
+                "final": final,
+                "validation": validation,
             },
             "artifacts": [
                 "demo.mp4",
+                captions_path.name,
+                "submission_pack.md",
                 "metadata.json",
             ],
         }
+        write_submission_pack(
+            run_dir,
+            command=command or ["repo-shorts", "creative", target],
+            metadata=metadata,
+            validation=validation,
+        )
         (run_dir / "metadata.json").write_text(json.dumps(metadata, indent=2) + "\n", encoding="utf-8")
         _complete("finalize", "Artifacts packaged")
 
@@ -139,6 +218,28 @@ def _preview_scenes(scenes: list[dict]) -> list[dict]:
     return selected
 
 
+def _brief_text_attr(brief, name: str, default: str) -> str:
+    value = getattr(brief, name, default)
+    if isinstance(value, str) and value:
+        return value
+    return default
+
+
+def _validate_final_brief(brief) -> None:
+    scenes = list(getattr(brief, "scenes", []) or [])
+    if len(scenes) < 5:
+        raise RuntimeError(f"Final mode requires at least 5 scenes; got {len(scenes)}.")
+    try:
+        total_duration = sum(float(scene.get("duration_seconds", 0) or 0) for scene in scenes)
+    except (TypeError, ValueError) as exc:
+        raise RuntimeError("Final mode requires numeric scene durations.") from exc
+    if total_duration < 43 or total_duration > 62:
+        raise RuntimeError(
+            "Final mode requires summed scene durations between 43 and 62 seconds; "
+            f"got {total_duration:.1f} seconds."
+        )
+
+
 def _copy_video(video_path: Path, output_path: Path) -> Path:
     output_path.parent.mkdir(parents=True, exist_ok=True)
     subprocess.run(
@@ -150,19 +251,68 @@ def _copy_video(video_path: Path, output_path: Path) -> Path:
     return output_path
 
 
+def _write_captions_srt(scenes: list[dict], output_path: Path) -> Path:
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    current_time = 0.0
+    blocks: list[str] = []
+    for index, scene in enumerate(scenes, start=1):
+        duration = float(scene.get("duration_seconds", 10))
+        narration = str(scene.get("narration", "")).strip()
+        start = current_time
+        end = current_time + duration
+        current_time = end
+        if not narration:
+            continue
+        blocks.append(f"{index}\n{_srt_timestamp(start)} --> {_srt_timestamp(end)}\n{narration}")
+    output_path.write_text("\n\n".join(blocks) + ("\n" if blocks else ""), encoding="utf-8")
+    return output_path
+
+
+def _srt_timestamp(seconds: float) -> str:
+    milliseconds = int(round(seconds * 1000))
+    hours, remainder = divmod(milliseconds, 3_600_000)
+    minutes, remainder = divmod(remainder, 60_000)
+    secs, millis = divmod(remainder, 1000)
+    return f"{hours:02d}:{minutes:02d}:{secs:02d},{millis:03d}"
+
+
+def _render_audio_label(*, skip_audio: bool, music_path: Path | None, generated_music: bool) -> str:
+    if skip_audio:
+        return "skipped"
+    if music_path is not None:
+        return "tts+supplied-music"
+    if generated_music:
+        return "tts+generated-music"
+    return "tts-only"
+
+
 def _build_repo_analysis(snapshot) -> dict:
     description = snapshot.package_metadata.get("description", "")
     if not description:
         description = _first_readme_sentence(snapshot.readme)
+    key_files = _safe_file_tree(snapshot.file_tree)
     return {
         "repo_name": snapshot.name,
         "description": description,
         "primary_language": snapshot.package_metadata.get("language", ""),
-        "key_files": snapshot.file_tree[:10],
+        "key_files": key_files,
         "purpose": description,
         "name": snapshot.name,
-        "components": [f.replace("src/", "").replace(".py", "").replace("/", " ").title() for f in snapshot.file_tree[:8] if ".py" in f or ".js" in f or ".ts" in f] or ["Core", "CLI", "Pipeline", "Render"],
+        "components": [f.replace("src/", "").replace(".py", "").replace("/", " ").title() for f in key_files[:8] if ".py" in f or ".js" in f or ".ts" in f] or ["Core", "CLI", "Pipeline", "Render"],
     }
+
+
+def _safe_file_tree(file_tree: list[str], limit: int = 10) -> list[str]:
+    safe = []
+    for path in file_tree:
+        lowered = path.lower()
+        if lowered.startswith("runs/") or any(marker in lowered for marker in SECRET_FILE_MARKERS):
+            continue
+        if path in SAFE_FILE_NAMES or path.startswith(SAFE_FILE_PREFIXES):
+            safe.append(path)
+        if len(safe) >= limit:
+            break
+    return safe
 
 
 def _merge_creative_video(
@@ -170,8 +320,12 @@ def _merge_creative_video(
     scenes: list[dict],
     output_path: Path,
     music_path: Path | None = None,
-) -> Path:
-    """Merge narrations (TTS), optional/generated music, and karaoke captions into the rendered video."""
+    tts_provider: str = "edge",
+    fallback_tts_provider: str | None = None,
+    voice: str | None = None,
+    generated_music: bool = True,
+) -> dict[str, object]:
+    """Merge narrations (TTS) and optional/generated music into the rendered video."""
     output_path = output_path.resolve()
     with tempfile.TemporaryDirectory() as tmpdir_str:
         tmpdir = Path(tmpdir_str)
@@ -179,14 +333,29 @@ def _merge_creative_video(
         # Generate TTS per scene
         tts_files: list[str] = []
         scene_durations: list[float] = []
+        used_providers: list[str] = []
+        has_any_narration = any(str(scene.get("narration") or "").strip() for scene in scenes)
         for i, scene in enumerate(scenes):
-            narration = scene.get("narration", "")
+            narration = str(scene.get("narration") or "").strip()
             duration = scene.get("duration_seconds", 10)
             scene_durations.append(float(duration))
             if narration:
                 tts_path = tmpdir / f"tts_{i:02d}.wav"
-                generate_tts(narration, tts_path)
-                tts_files.append(str(tts_path.resolve()))
+                aligned_tts_path = tmpdir / f"tts_aligned_{i:02d}.wav"
+                generate_tts(
+                    narration,
+                    tts_path,
+                    provider=tts_provider,
+                    fallback_provider=fallback_tts_provider,
+                    voice=voice,
+                    provider_report=used_providers.append,
+                )
+                _fit_audio_to_duration(tts_path, aligned_tts_path, float(duration))
+                tts_files.append(str(aligned_tts_path.resolve()))
+            elif has_any_narration:
+                silence_path = tmpdir / f"tts_silence_{i:02d}.wav"
+                _create_silence_audio(silence_path, float(duration))
+                tts_files.append(str(silence_path.resolve()))
 
         if not tts_files:
             # No narration: just copy video
@@ -196,7 +365,7 @@ def _merge_creative_video(
                 capture_output=True,
                 text=True,
             )
-            return output_path
+            return {"output": output_path, "actual_tts_provider": None}
 
         # Concatenate all TTS segments
         concat_list = tmpdir / "tts_concat.txt"
@@ -212,8 +381,11 @@ def _merge_creative_video(
         # Generate ambient music if none provided
         total_duration = max(1, int(round(sum(scene_durations))))
         if music_path is None or not music_path.exists():
-            music_path = tmpdir / "ambient_music.mp3"
-            generate_ambient_music(music_path, duration=max(total_duration, 30))
+            if generated_music:
+                music_path = tmpdir / "ambient_music.mp3"
+                generate_ambient_music(music_path, duration=max(total_duration, 30))
+            else:
+                music_path = None
 
         # Mix voice + music
         mixed_audio = tmpdir / "mixed.aac"
@@ -243,29 +415,64 @@ def _merge_creative_video(
             text=True,
         )
 
-        # Build karaoke captions
-        caption_data = []
-        current_time = 0.0
-        for scene in scenes:
-            narration = scene.get("narration", "")
-            duration = scene.get("duration_seconds", 10)
-            if narration:
-                caption_data.append({
-                    "text": narration,
-                    "start": current_time,
-                    "duration": float(duration),
-                })
-            current_time += float(duration)
+        _copy_video(video_with_audio, output_path)
 
-        # Burn captions onto final video
-        burn_karaoke_captions(video_with_audio, caption_data, output_path)
+    return {"output": output_path, "actual_tts_provider": _summarize_providers(used_providers)}
 
+
+def _fit_audio_to_duration(input_path: Path, output_path: Path, duration_seconds: float) -> Path:
+    subprocess.run(
+        [
+            "ffmpeg",
+            "-y",
+            "-i",
+            str(input_path.resolve()),
+            "-af",
+            f"apad,atrim=0:{duration_seconds:.3f}",
+            "-ar",
+            "44100",
+            "-ac",
+            "2",
+            str(output_path.resolve()),
+        ],
+        check=True,
+        capture_output=True,
+        text=True,
+    )
     return output_path
 
 
-def _has_api_key() -> bool:
-    import os
-    return bool(os.environ.get("OPENROUTER_API_KEY") or os.environ.get("KIMI_API_KEY"))
+def _create_silence_audio(output_path: Path, duration_seconds: float) -> Path:
+    subprocess.run(
+        [
+            "ffmpeg",
+            "-y",
+            "-f",
+            "lavfi",
+            "-i",
+            "anullsrc=channel_layout=stereo:sample_rate=44100",
+            "-t",
+            f"{duration_seconds:.3f}",
+            "-ar",
+            "44100",
+            "-ac",
+            "2",
+            str(output_path.resolve()),
+        ],
+        check=True,
+        capture_output=True,
+        text=True,
+    )
+    return output_path
+
+
+def _summarize_providers(providers: list[str]) -> str | None:
+    if not providers:
+        return None
+    unique = sorted(set(providers))
+    if len(unique) == 1:
+        return unique[0]
+    return "mixed:" + ",".join(unique)
 
 
 def _first_readme_sentence(readme: str) -> str:
