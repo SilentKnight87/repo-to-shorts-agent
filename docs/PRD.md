@@ -280,7 +280,7 @@ Planned web command:
 repo-shorts web --host 127.0.0.1 --port 8765
 ```
 
-Optional LAN demo mode, only when the operator wants laptop access:
+Optional LAN demo mode, only when LAN access is desired:
 
 ```bash
 repo-shorts web --host 0.0.0.0 --port 8765
@@ -488,4 +488,4 @@ If MP4 rendering gets slow or brittle, use `demo.html` and generated copy. A sub
 4. Generate a fresh live Kimi + MP4 golden run.
 5. Record final demo showing web UI, metadata proof, Kimi critique, and output artifacts.
 6. Tighten X/Discord copy.
-7. Submit only after maintainer approves.
+7. Submit only after maintainer approval.

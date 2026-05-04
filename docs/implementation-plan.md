@@ -77,7 +77,7 @@ OPENROUTER_API_KEY="***" .venv/bin/repo-shorts analyze . \
 | Static viewing | Works via ad hoc server | fold into local web command |
 | Browser form | Not built | build minimal local form |
 | Job status | Not built | synchronous success/error page first |
-| Submission posting | Not built | manual, after maintainer approves |
+| Submission posting | Not built | manual, after maintainer approval |
 
 ## Scope rules
 
@@ -104,4 +104,4 @@ OPENROUTER_API_KEY="***" .venv/bin/repo-shorts analyze . \
 3. Generate fresh live Kimi + MP4 golden run.
 4. Record demo showing input, generation, metadata proof, Kimi critique, and output.
 5. Tighten X/Discord copy.
-6. Submit only after maintainer approves.
+6. Submit only after maintainer approval.

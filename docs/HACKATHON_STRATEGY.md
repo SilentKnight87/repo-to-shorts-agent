@@ -298,7 +298,7 @@ This has a real shot if the final submission proves:
 3. Generate a fresh live Kimi + MP4 golden run.
 4. Record the demo showing the UI or CLI input, generated folder, `metadata.json`, `kimi_critique.md`, `demo.html`, and `demo.mp4`.
 5. Tighten X/Discord copy.
-6. Submit only after maintainer approves.
+6. Submit only after maintainer approval.
 
 ## Final submission positioning
 

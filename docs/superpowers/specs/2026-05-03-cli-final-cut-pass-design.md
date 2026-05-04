@@ -29,7 +29,7 @@ The hackathon priority is to produce one credible artifact quickly:
 - a clean narration track
 - captions that read well on mobile
 - visible repo evidence without leaking secrets
-- copy and instructions a user can use for X and Discord
+- copy and instructions the operator can use for X and Discord
 
 ## Goal
 
