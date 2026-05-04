@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 import subprocess
 from pathlib import Path
 
@@ -174,14 +175,14 @@ def test_generate_tts_uses_xai_provider(monkeypatch, tmp_path: Path):
     monkeypatch.setattr("repo_to_shorts.compositor.urllib.request.urlopen", fake_urlopen)
     monkeypatch.setattr("repo_to_shorts.compositor.subprocess.run", fake_run)
 
-    result = generate_tts("Ship this repo.", tmp_path / "tts.wav", provider="xai", voice="orpheus")
+    result = generate_tts("Ship this repo.", tmp_path / "tts.wav", provider="xai")
 
     assert result == (tmp_path / "tts.wav").resolve()
     assert requests
     assert requests[0].full_url == "https://api.x.ai/v1/tts"
     assert requests[0].headers["Authorization"] == "Bearer test-xai"
-    assert b"Ship this repo." in requests[0].data
-    assert b"orpheus" in requests[0].data
+    payload = json.loads(requests[0].data)
+    assert payload == {"text": "Ship this repo.", "voice_id": "eve", "language": "en"}
     assert commands[0][0] == "ffmpeg"
 
 

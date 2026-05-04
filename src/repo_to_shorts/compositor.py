@@ -203,7 +203,7 @@ def _generate_xai_tts(text: str, output_path: Path, voice: str | None) -> Path:
         raise RuntimeError("XAI_API_KEY is required for xai TTS provider") from exc
 
     url = "https://api.x.ai/v1/tts"
-    payload = {"model": "grok-2-voice", "input": text, "voice": voice or "orpheus", "response_format": "mp3"}
+    payload = {"text": text, "voice_id": voice or "eve", "language": "en"}
     headers = {"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"}
     return _request_tts_mp3(url, payload, headers, output_path)
 
