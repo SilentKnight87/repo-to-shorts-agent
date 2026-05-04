@@ -10,3 +10,5 @@ build/
 .env
 .env.*
 !.env.example
+.superpowers/
+.worktrees/
