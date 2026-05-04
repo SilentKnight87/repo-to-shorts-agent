@@ -61,6 +61,8 @@ def validate_media(
     if audio_stream:
         result["has_audio"] = True
         result["audio_duration_seconds"] = _float_or_none(audio_stream.get("duration"))
+        if require_audio and result["audio_duration_seconds"] is None:
+            errors.append("audio duration is required")
     elif require_audio:
         errors.append("audio stream is required")
 
@@ -91,7 +93,10 @@ def _ffprobe(video_path: Path) -> dict[str, Any]:
         completed = subprocess.run(command, check=True, capture_output=True, text=True)
     except (FileNotFoundError, subprocess.CalledProcessError) as exc:
         raise RuntimeError(f"ffprobe failed: {exc}") from exc
-    return json.loads(completed.stdout)
+    try:
+        return json.loads(completed.stdout)
+    except json.JSONDecodeError as exc:
+        raise RuntimeError("ffprobe returned invalid JSON") from exc
 
 
 def _float_or_none(value: object) -> float | None:

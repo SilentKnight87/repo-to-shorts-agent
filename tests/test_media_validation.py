@@ -75,3 +75,40 @@ def test_validate_media_allows_silent_when_audio_not_required(monkeypatch, tmp_p
 
     assert result["ok"] is True
     assert result["has_audio"] is False
+
+
+def test_validate_media_reports_invalid_ffprobe_json(monkeypatch, tmp_path: Path):
+    video = tmp_path / "demo.mp4"
+    video.write_bytes(b"mp4")
+
+    monkeypatch.setattr(
+        "repo_to_shorts.media_validation.subprocess.run",
+        lambda command, **kwargs: subprocess.CompletedProcess(command, 0, "not json", ""),
+    )
+
+    result = validate_media(video, require_audio=True)
+
+    assert result["ok"] is False
+    assert any("ffprobe" in error or "invalid JSON" in error for error in result["errors"])
+
+
+def test_validate_media_requires_audio_duration_when_audio_required(monkeypatch, tmp_path: Path):
+    video = tmp_path / "demo.mp4"
+    video.write_bytes(b"mp4")
+    probe = {
+        "format": {"duration": "50"},
+        "streams": [
+            {"codec_type": "video", "width": 1080, "height": 1920, "duration": "50"},
+            {"codec_type": "audio"},
+        ],
+    }
+
+    monkeypatch.setattr(
+        "repo_to_shorts.media_validation.subprocess.run",
+        lambda command, **kwargs: subprocess.CompletedProcess(command, 0, json.dumps(probe), ""),
+    )
+
+    result = validate_media(video, require_audio=True)
+
+    assert result["ok"] is False
+    assert "audio duration is required" in result["errors"]

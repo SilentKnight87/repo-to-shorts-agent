@@ -95,3 +95,28 @@ def test_write_submission_pack_redacts_hyphenated_secret_flags(tmp_path: Path, f
     text = path.read_text(encoding="utf-8")
     assert "fake-secret-value" not in text
     assert "[REDACTED]" in text
+
+
+@pytest.mark.parametrize(
+    "command",
+    [
+        ["repo-shorts", "creative", "--api-key", "fake-secret-value", "."],
+        ["repo-shorts", "creative", "--openrouter-api-key", "fake-secret-value", "."],
+        ["repo-shorts", "creative", "--token", "fake-secret-value", "."],
+        ["repo-shorts", "creative", "--secret", "fake-secret-value", "."],
+    ],
+)
+def test_write_submission_pack_redacts_values_after_split_secret_flags(tmp_path: Path, command: list[str]):
+    run_dir = tmp_path / "run"
+    run_dir.mkdir()
+
+    path = write_submission_pack(
+        run_dir,
+        command=command,
+        metadata={"repo_name": "demo", "kimi": {"mode": "deterministic-fallback"}, "creative_brief": {}},
+        validation={"ok": False, "errors": ["missing audio"]},
+    )
+
+    text = path.read_text(encoding="utf-8")
+    assert "fake-secret-value" not in text
+    assert "[REDACTED]" in text

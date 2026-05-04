@@ -102,8 +102,15 @@ Generated hook: {brief.get("hook", "See generated creative brief.")}"""
 
 def _redact_command(command: list[str]) -> str:
     safe_parts = []
+    redact_next = False
     for part in command:
-        if _looks_secret(part):
+        if redact_next:
+            safe_parts.append("[REDACTED]")
+            redact_next = False
+        elif _is_secret_split_flag(part):
+            safe_parts.append(shlex.quote(part))
+            redact_next = True
+        elif _looks_secret(part):
             if "=" in part:
                 safe_parts.append(part.split("=", 1)[0] + "=[REDACTED]")
             else:
@@ -111,6 +118,22 @@ def _redact_command(command: list[str]) -> str:
         else:
             safe_parts.append(shlex.quote(part))
     return " ".join(safe_parts)
+
+
+def _is_secret_split_flag(value: str) -> bool:
+    if "=" in value:
+        return False
+    normalized = value.lstrip("-").lower().replace("_", "-")
+    return normalized in {
+        "api-key",
+        "openrouter-api-key",
+        "xai-api-key",
+        "openai-api-key",
+        "token",
+        "access-token",
+        "secret",
+        "secret-key",
+    }
 
 
 def _looks_secret(value: str) -> bool:
