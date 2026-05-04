@@ -2,7 +2,7 @@
 
 **Repo-to-Shorts Agent** turns a GitHub repo or local codebase into a launch-ready short-video package for hackathon demos and product launches.
 
-Demo video: <X POST URL HERE>
+Demo video: attach the published X post URL here after posting.
 
 How it works:
 
@@ -27,4 +27,4 @@ Output includes MP4, captions (SRT), metadata proof, and submission copy — eve
 
 Submitted for the Hermes Agent Creative Hackathon. Built with Hermes Agent and Kimi K2.6.
 
-<GITHUB URL>
+Repo: https://github.com/SilentKnight87/repo-to-shorts-agent

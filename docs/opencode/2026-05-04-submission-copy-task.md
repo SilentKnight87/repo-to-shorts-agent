@@ -41,7 +41,7 @@ Exactly **5 tweet drafts**. Each ≤280 characters. Each tags `@NousResearch` an
 | d | Process proof | "Hermes won't declare success until `kimi.mode=live-api` shows up in metadata.json." |
 | e | Before/after | "git clone → 60s vertical short with X copy ready." |
 
-Each tweet must end with the placeholder `<DEMO VIDEO URL>` on its own line, plus tags.
+Each tweet should assume the generated demo MP4 is attached directly, plus tags.
 
 Format the file as:
 
@@ -49,7 +49,7 @@ Format the file as:
 # X Post Variants
 
 ## Variant A — Technical
-<tweet text, ≤280 chars including tags and URL placeholder>
+<tweet text, ≤280 chars including tags>
 
 ## Variant B — Creative Meta
 <tweet text>
@@ -64,7 +64,7 @@ No emoji. No marketing voice. Builder-to-builder.
 One Discord post (~150 words) for the Nous Research `creative-hackathon-submissions` channel. Structure:
 
 - **Lead line** (1 sentence): project name + what it does
-- **Demo video link**: `<X POST URL HERE>`
+- **Demo video link**: published X post URL after upload
 - **How it works** (3 bullets):
   - Hermes Agent skill (`.hermes/skill/SKILL.md`) — judges can `hermes` and run `/repo-shorts-creative <target>`
   - Kimi K2.6 directs the storyboard via OpenRouter — visible in `metadata.json` as `kimi.mode: live-api`
@@ -78,7 +78,7 @@ One Discord post (~150 words) for the Nous Research `creative-hackathon-submissi
   ```
   repo-shorts creative <target> --final
   ```
-- **Closing**: `<GITHUB URL>`
+- **Closing**: public GitHub repo URL
 
 Tone: builder-to-builder, honest about scope. No emoji. No marketing voice.
 
@@ -103,7 +103,7 @@ A 60-second screen recording shot list with **timestamps every 5 seconds**. Two-
 # Demo Shot List — 60s, 9:16
 
 ## Pre-record setup
-- Terminal: zsh in `/Users/operator/Documents/Code/repo-to-shorts-agent`, font size XL
+- Terminal: zsh in `<repo-root>`, font size XL
 - Browser: `http://127.0.0.1:8765` open, dark theme matched to terminal
 - Recording: 1080×1920 vertical, 30fps, screen capture both panes side-by-side
 

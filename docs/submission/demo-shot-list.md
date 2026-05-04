@@ -2,7 +2,7 @@
 
 ## Pre-record setup
 
-- Terminal: zsh in `/Users/operator/Documents/Code/repo-to-shorts-agent`, font size XL, dark background.
+- Terminal: zsh in `<repo-root>`, font size XL, dark background.
 - Browser: `http://127.0.0.1:8765` open, dark theme matched to terminal, VHS broadcast aesthetic active.
 - Recording: 1080x1920 vertical, 30fps, screen capture both panes side-by-side. Terminal on left (60% width), browser on right (40% width).
 - Audio: capture system audio only (no mic). The generated MP4 provides its own TTS + music audio track.

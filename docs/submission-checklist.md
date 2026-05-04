@@ -85,7 +85,7 @@ Or natural language: *"Make a launch short for this repo: . Run final mode."*
 In another terminal:
 
 ```bash
-cd /Users/operator/Documents/Code/repo-to-shorts-agent
+cd <repo-root>
 .venv/bin/repo-shorts creative . \
   --audience "Nous Research Hermes Agent Creative Hackathon judges" \
   --kimi-model moonshotai/kimi-k2.6 \
@@ -129,7 +129,7 @@ If Codex finished Remotion polish:
 
 ### 3.1 — Pre-record setup (~5 min)
 
-- [ ] Terminal: zsh in `/Users/operator/Documents/Code/repo-to-shorts-agent`, font size XL (so it's readable in a 1080×1920 capture)
+- [ ] Terminal: zsh in `<repo-root>`, font size XL (so it's readable in a 1080×1920 capture)
 - [ ] Browser: `http://127.0.0.1:8765` open with a fresh load (`.venv/bin/repo-shorts web` running in another terminal)
 - [ ] Confirm SKILL badge is visible in the hero
 - [ ] Screen recorder set to 1080×1920, 30fps
@@ -167,13 +167,13 @@ Two-track structure recommended (or split-screen via QuickTime + Photo Booth or 
 ### 4.2 — Pick & finalize X tweet (~5 min)
 
 - [ ] Read all 5 variants — pick the one that lands hardest given the actual recording you just made
-- [ ] Substitute `<DEMO VIDEO URL>` with… nothing yet (you'll paste it after upload)
+- [ ] Attach the generated demo MP4 directly to the post
 - [ ] Verify ≤280 chars including tags
 - [ ] Tags `@NousResearch` and `@Kimi_Moonshot` are both present
 
 ### 4.3 — Finalize Discord post (~3 min)
 
-- [ ] Substitute `<X POST URL HERE>` and `<GITHUB URL>` placeholders
+- [ ] Add the published X post URL and public GitHub repo URL
 - [ ] Verify it mentions the Hermes skill path (`.hermes/skill/SKILL.md`) and the live-Kimi proof claim
 - [ ] No marketing voice, no emoji
 
@@ -193,8 +193,8 @@ Two-track structure recommended (or split-screen via QuickTime + Photo Booth or 
 
 - [ ] Open Nous Research Discord, navigate to `creative-hackathon-submissions` channel
 - [ ] Paste the Discord post from `discord-post.md`
-- [ ] Replace `<X POST URL HERE>` with the X post URL from 5.1
-- [ ] Replace `<GITHUB URL>` with `https://github.com/SilentKnight87/repo-to-shorts-agent`
+- [ ] Add the X post URL from 5.1
+- [ ] Add `https://github.com/SilentKnight87/repo-to-shorts-agent`
 - [ ] Post
 
 ### 5.3 — Verify submission (~2 min)

@@ -147,9 +147,9 @@ Network calls must not run in tests. Use monkeypatch/mocks around `_call_openrou
 - Add `demo.mp4` to the artifact manifest only when MP4 rendering is requested.
 - Prefer simple, deterministic Pillow scene cards over fragile creative dependencies.
 
-## Planned web UI behavior
+## Web UI behavior
 
-The web UI is not implemented yet. When added, it should wrap `pipeline.run_analysis(...)`; it must not fork the generation logic.
+The web UI is implemented as a local wrapper around the existing pipeline. It should continue to call `pipeline.run_analysis(...)` for classic runs and `hermes_skill.run_creative_pipeline(...)` for creative runs; it must not fork generation logic.
 
 Safe defaults:
 - default host: `127.0.0.1`
@@ -163,7 +163,7 @@ See `docs/plans/2026-05-03-local-web-ui-plan.md` before building.
 ## Coding rules
 
 - Keep the golden path reliable without credentials.
-- Do not add external posting, browser automation, or public submission behavior without explicit approval from the operator.
+- Do not add external posting, browser automation, or public submission behavior without explicit maintainer approval.
 - Prefer small, tested changes over big rewrites.
 - Add tests before behavior changes.
 - Keep generated `runs/` out of git.
@@ -196,7 +196,7 @@ polish: improve demo artifact checklist
 ## Hackathon priority order
 
 1. Preserve live Kimi proof in generated artifacts.
-2. Review and follow the local web UI plan before implementation.
+2. Keep the web UI wrapping the existing CLI/pipeline behavior.
 3. Keep the demo browser-recordable and legible.
 4. Make X/Discord copy concise and honest.
 5. Keep optional MP4 rendering honest and stable.

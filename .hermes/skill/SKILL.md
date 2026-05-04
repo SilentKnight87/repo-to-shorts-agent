@@ -30,17 +30,16 @@ If the user didn't supply a target, ask once: "Which repo should I turn into a s
 ## Procedure
 
 1. Confirm `target` is set. If not, ask the user.
-2. Invoke the Repo-to-Shorts CLI in final mode using the project's venv:
+2. Invoke the Repo-to-Shorts CLI in final mode. If the CLI is installed in a local checkout, run this from that repo root and use `.venv/bin/repo-shorts` instead of `repo-shorts`:
 
    ```bash
-   cd /Users/operator/Documents/Code/repo-to-shorts-agent && \
-     .venv/bin/repo-shorts creative "<target>" \
-       --audience "<audience>" \
-       --kimi-model moonshotai/kimi-k2.6 \
-       --tts-provider xai \
-       --fallback-tts-provider openai \
-       --out runs \
-       --final
+   repo-shorts creative "<target>" \
+     --audience "<audience>" \
+     --kimi-model moonshotai/kimi-k2.6 \
+     --tts-provider xai \
+     --fallback-tts-provider openai \
+     --out runs \
+     --final
    ```
 
 3. The CLI prints the run directory (`runs/<timestamp>-<repo>/`) and the path to `demo.mp4`. Capture both from stdout.
@@ -72,7 +71,7 @@ Before claiming success:
 
 ## Pitfalls
 
-- The CLI must be run from the repo root, not from `~/.hermes`. The `cd` in the command above is required.
-- The repo's `.env` provides `OPENROUTER_API_KEY`, `XAI_API_KEY`, `OPENAI_API_KEY`. Do not echo these values back to the user.
+- If using a local editable checkout, run the CLI from the repo root, not from `~/.hermes`.
+- The user must provide API keys via environment variables such as `OPENROUTER_API_KEY`, `XAI_API_KEY`, and `OPENAI_API_KEY`. Do not echo these values back to the user.
 - Final mode requires 5+ scenes and 45-60s duration; the CLI will exit non-zero with a clear message if Kimi returns an out-of-bound brief.
 - Do not fabricate Kimi proof. If the live call failed and the pipeline used deterministic fallback, say so plainly.
