@@ -187,12 +187,21 @@ export const normalizeManifest = (input: RepoShortsManifest = {}): NormalizedMan
 
 export const getDurationInFrames = (manifest: RepoShortsManifest): number => {
   const normalized = normalizeManifest(manifest);
-  const sceneDuration = normalized.scenes.reduce(
-    (total, scene) => total + scene.duration_seconds,
+  const sceneFrames = normalized.scenes.reduce(
+    (total, scene) => total + getSceneDurationInFrames(scene, normalized.video.fps),
     0,
   );
-  const seconds = sceneDuration || normalized.video.duration_seconds;
-  return Math.max(1, Math.round(seconds * normalized.video.fps));
+  return (
+    sceneFrames ||
+    Math.max(1, Math.round(normalized.video.duration_seconds * normalized.video.fps))
+  );
+};
+
+export const getSceneDurationInFrames = (
+  scene: Pick<Required<RepoShortsScene>, 'duration_seconds'>,
+  fps: number,
+): number => {
+  return Math.max(1, Math.round(scene.duration_seconds * fps));
 };
 
 export const RepoShortsVideo: React.FC<RepoShortsManifest> = (props) => {
@@ -204,7 +213,7 @@ export const RepoShortsVideo: React.FC<RepoShortsManifest> = (props) => {
     <AbsoluteFill style={baseFill}>
       <Backplate manifest={manifest} />
       {manifest.scenes.map((scene, index) => {
-        const duration = Math.max(1, Math.round(scene.duration_seconds * fps));
+        const duration = getSceneDurationInFrames(scene, fps);
         const sequence = (
           <Sequence from={from} durationInFrames={duration} key={`${scene.type}-${index}`}>
             <SceneFrame
