@@ -10,6 +10,8 @@ from repo_to_shorts.manim_render import (
     _active_caption_chunk,
     _caption_chunks,
     _fit_caption_lines,
+    _plan_scene_layouts,
+    _scene_headline,
     generate_manim_script,
     render_scene,
 )
@@ -97,6 +99,16 @@ def test_caption_chunks_create_karaoke_phrases():
     ]
 
 
+def test_caption_chunks_keep_long_phrases_tight_for_mobile_video():
+    chunks = _caption_chunks(
+        "Every hackathon ends the same with late night editing and a demo that still hides the build",
+        words_per_chunk=3,
+    )
+
+    assert chunks
+    assert all(len(chunk.split()) <= 3 for chunk in chunks)
+
+
 def test_active_caption_chunk_advances_with_scene_time():
     text = "This repo turns source code into a launch film with proof"
 
@@ -115,6 +127,38 @@ def test_fit_caption_lines_keeps_long_chunks_inside_safe_width():
 
     assert 1 <= len(lines) <= 2
     assert all(draw.textlength(line, font=font) <= 828 for line in lines)
+
+
+def test_plan_scene_layouts_creates_varied_story_arc():
+    scenes = [
+        {"visual_tool": "ascii", "narration": "Every hackathon ends the same."},
+        {"visual_tool": "svg", "narration": "This repo inverts the pipeline."},
+        {"visual_tool": "pretext", "narration": "The engine thinks in scenes."},
+        {"visual_tool": "manim", "narration": "Core analyzes. CLI orchestrates."},
+        {"visual_tool": "ascii", "narration": "Let your repo speak."},
+    ]
+
+    layouts = _plan_scene_layouts(scenes)
+
+    assert layouts == ["hook", "pipeline_flow", "statement", "architecture_flow", "cta"]
+    assert all(a != b for a, b in zip(layouts, layouts[1:], strict=False))
+    assert len(set(layouts)) >= 5
+
+
+def test_scene_headlines_are_specific_instead_of_repeating_generic_titles():
+    scenes = [
+        {"narration": "Every hackathon ends the same. The code works. Nobody sees it."},
+        {"narration": "This repo inverts the pipeline. Push your code. Get a short."},
+        {"narration": "The engine thinks in scenes. Hook. Proof. Payoff."},
+        {"narration": "Core analyzes. CLI orchestrates. Pipeline sequences."},
+        {"narration": "Stop explaining your repo. Let your repo speak."},
+    ]
+
+    headlines = [_scene_headline(scene, index, len(scenes)) for index, scene in enumerate(scenes)]
+
+    assert len(set(headlines)) == len(headlines)
+    assert "Architecture in motion" not in headlines
+    assert "Evidence, not vibes" not in headlines
 
 
 def test_render_scene_creates_mp4(monkeypatch, tmp_path: Path):
