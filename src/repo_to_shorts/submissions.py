@@ -20,6 +20,14 @@ def write_submission_pack(
     command_text = _redact_command(command)
     validation_errors = validation.get("errors") or []
     validation_status = "pass" if validation.get("ok") else "needs attention"
+    x_post_draft = _generated_copy_or_fallback(
+        run_dir / "x_post.md",
+        _fallback_x_post_draft(kimi),
+    )
+    discord_submission_draft = _generated_copy_or_fallback(
+        run_dir / "submission.md",
+        _fallback_discord_submission_draft(brief),
+    )
 
     text = f"""# Submission Pack
 
@@ -45,19 +53,11 @@ Hermes orchestrated the workflow by running the CLI, inspecting the generated pr
 
 ## X Post Draft
 
-I built Repo-to-Shorts Agent for the Hermes Agent Creative Hackathon.
-
-Paste a repo, and Hermes runs a Kimi-directed workflow that turns code evidence into a launch-ready vertical short: narration, captions, MP4, metadata proof, and submission copy.
-
-Kimi proof: `{kimi.get("mode", "unknown")}` via `{kimi.get("model", "unknown")}`.
+{x_post_draft}
 
 ## Discord Submission Draft
 
-Repo-to-Shorts Agent turns a GitHub repo or local codebase into a short-video package for launches and hackathon demos.
-
-Hermes orchestrates the workflow. Kimi acts as creative director. The CLI writes `demo.mp4`, `metadata.json`, `captions.srt`, and this submission pack.
-
-Generated hook: {brief.get("hook", "See generated creative brief.")}
+{discord_submission_draft}
 
 ## Recording Beats
 
@@ -78,6 +78,28 @@ Generated hook: {brief.get("hook", "See generated creative brief.")}
     return path
 
 
+def _generated_copy_or_fallback(path: Path, fallback: str) -> str:
+    if path.exists():
+        return path.read_text(encoding="utf-8")
+    return fallback
+
+
+def _fallback_x_post_draft(kimi: dict[str, Any]) -> str:
+    return f"""I built Repo-to-Shorts Agent for the Hermes Agent Creative Hackathon.
+
+Paste a repo, and Hermes runs a Kimi-directed workflow that turns code evidence into a launch-ready vertical short: narration, captions, MP4, metadata proof, and submission copy.
+
+Kimi proof: `{kimi.get("mode", "unknown")}` via `{kimi.get("model", "unknown")}`."""
+
+
+def _fallback_discord_submission_draft(brief: dict[str, Any]) -> str:
+    return f"""Repo-to-Shorts Agent turns a GitHub repo or local codebase into a short-video package for launches and hackathon demos.
+
+Hermes orchestrates the workflow. Kimi acts as creative director. The CLI writes `demo.mp4`, `metadata.json`, `captions.srt`, and this submission pack.
+
+Generated hook: {brief.get("hook", "See generated creative brief.")}"""
+
+
 def _redact_command(command: list[str]) -> str:
     safe_parts = []
     for part in command:
@@ -93,10 +115,17 @@ def _redact_command(command: list[str]) -> str:
 
 def _looks_secret(value: str) -> bool:
     lowered = value.lower()
-    return (
-        "api_key=" in lowered
-        or "token=" in lowered
-        or "secret=" in lowered
-        or "sk-" in value
-        or "sk_or_" in lowered
+    secret_markers = (
+        "api_key=",
+        "api-key=",
+        "openrouter-api-key=",
+        "xai-api-key=",
+        "openai-api-key=",
+        "token=",
+        "access-token=",
+        "secret=",
+        "secret-key=",
+        "sk-",
+        "sk_or_",
     )
+    return any(marker in lowered for marker in secret_markers)
