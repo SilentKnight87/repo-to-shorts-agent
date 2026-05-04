@@ -17,13 +17,13 @@ class CreativeBrief:
     total_duration: int = 60
 
 
-def direct(repo_analysis: dict, model: str = "moonshotai/kimi-k2.6") -> CreativeBrief:
+def direct(repo_analysis: dict, model: str = "moonshotai/kimi-k2.6", *, final: bool = False) -> CreativeBrief:
     """Kimi 2.6 creative director: analyze repo → output creative brief."""
     api_key = os.environ.get("OPENROUTER_API_KEY") or os.environ.get("KIMI_API_KEY")
     if not api_key:
         return _deterministic_fallback(repo_analysis)
 
-    prompt = _build_director_prompt(repo_analysis)
+    prompt = _build_director_prompt(repo_analysis, final=final)
     try:
         response = _call_openrouter_api(prompt, model, "https://openrouter.ai/api/v1")
         return _parse_brief(response)
@@ -31,9 +31,9 @@ def direct(repo_analysis: dict, model: str = "moonshotai/kimi-k2.6") -> Creative
         return _deterministic_fallback(repo_analysis)
 
 
-def _build_director_prompt(analysis: dict) -> str:
+def _build_director_prompt(analysis: dict, *, final: bool = False) -> str:
     """Build the creative director prompt from repo analysis."""
-    return f"""You are an elite creative director making a hackathon demo video that must feel like Runway/Linear, not a generated slideshow.
+    prompt = f"""You are an elite creative director making a hackathon demo video that must feel like Runway/Linear, not a generated slideshow.
 Your job is to convert code evidence into a sharp 60-second vertical short with a real point of view.
 
 REPO: {analysis.get('repo_name')}
@@ -71,6 +71,17 @@ Creative rules:
 - Keep narration speakable. Short sentences. No corporate mush.
 - For this app specifically, emphasize the meta demo: the app generates the video that presents the app.
 """
+    if final:
+        prompt += """
+Final export constraints:
+- Total runtime must be 45-60 seconds.
+- Use at least 5 scenes.
+- Use concrete repo evidence from KEY_FILES and COMPONENTS.
+- Do not include .env, secret, token, private key, credential, or generated run files in visual evidence or narration.
+- Make the first 3 seconds understandable without audio.
+- Include a final CTA suitable for a hackathon submission.
+"""
+    return prompt
 
 
 def _deterministic_fallback(analysis: dict) -> CreativeBrief:

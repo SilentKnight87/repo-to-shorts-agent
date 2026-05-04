@@ -12,6 +12,10 @@ from repo_to_shorts.ingest import ingest_target
 from repo_to_shorts.manim_render import generate_manim_script, render_scene
 from repo_to_shorts.progress import ProgressTracker
 
+SAFE_FILE_PREFIXES = ("src/", "tests/", "docs/")
+SAFE_FILE_NAMES = {"README.md", "pyproject.toml", "package.json"}
+SECRET_FILE_MARKERS = (".env", "secret", "token", "private", "id_rsa", ".pem", ".key")
+
 
 def run_creative_pipeline(
     target: str,
@@ -154,15 +158,29 @@ def _build_repo_analysis(snapshot) -> dict:
     description = snapshot.package_metadata.get("description", "")
     if not description:
         description = _first_readme_sentence(snapshot.readme)
+    key_files = _safe_file_tree(snapshot.file_tree)
     return {
         "repo_name": snapshot.name,
         "description": description,
         "primary_language": snapshot.package_metadata.get("language", ""),
-        "key_files": snapshot.file_tree[:10],
+        "key_files": key_files,
         "purpose": description,
         "name": snapshot.name,
-        "components": [f.replace("src/", "").replace(".py", "").replace("/", " ").title() for f in snapshot.file_tree[:8] if ".py" in f or ".js" in f or ".ts" in f] or ["Core", "CLI", "Pipeline", "Render"],
+        "components": [f.replace("src/", "").replace(".py", "").replace("/", " ").title() for f in key_files[:8] if ".py" in f or ".js" in f or ".ts" in f] or ["Core", "CLI", "Pipeline", "Render"],
     }
+
+
+def _safe_file_tree(file_tree: list[str], limit: int = 10) -> list[str]:
+    safe = []
+    for path in file_tree:
+        lowered = path.lower()
+        if lowered.startswith("runs/") or any(marker in lowered for marker in SECRET_FILE_MARKERS):
+            continue
+        if path in SAFE_FILE_NAMES or path.startswith(SAFE_FILE_PREFIXES):
+            safe.append(path)
+        if len(safe) >= limit:
+            break
+    return safe
 
 
 def _merge_creative_video(

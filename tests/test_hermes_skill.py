@@ -31,6 +31,25 @@ def test_build_repo_analysis_fallback_description():
     assert "This is a test" in analysis["description"]
 
 
+def test_build_repo_analysis_filters_secret_like_paths():
+    snapshot = FakeSnapshot()
+    snapshot.file_tree = [
+        ".env",
+        ".env.local",
+        "runs/20260503/demo.mp4",
+        "src/app.py",
+        "tests/test_app.py",
+        "private_key.pem",
+        "docs/PRD.md",
+    ]
+
+    analysis = _build_repo_analysis(snapshot)
+
+    assert analysis["key_files"] == ["src/app.py", "tests/test_app.py", "docs/PRD.md"]
+    assert ".env" not in str(analysis)
+    assert "private_key.pem" not in str(analysis)
+
+
 @patch("repo_to_shorts.hermes_skill.ingest_target")
 @patch("repo_to_shorts.hermes_skill.direct")
 @patch("repo_to_shorts.hermes_skill.generate_manim_script")

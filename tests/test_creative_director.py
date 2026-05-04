@@ -4,6 +4,7 @@ import json
 
 from repo_to_shorts.creative_director import (
     CreativeBrief,
+    _build_director_prompt,
     _deterministic_fallback,
     _loads_brief_json,
     _parse_brief,
@@ -77,6 +78,24 @@ def test_direct_fallback_when_no_api_key(monkeypatch):
     assert result.hook == "A codebase walks into a cinema."
     assert len(result.scenes) == 5
     assert result.total_duration == 60
+
+
+def test_final_director_prompt_requires_postable_duration_and_secret_filtering():
+    prompt = _build_director_prompt(
+        {
+            "repo_name": "repo-to-shorts",
+            "description": "Turns repos into shorts",
+            "key_files": ["src/app.py"],
+            "components": ["CLI"],
+        },
+        final=True,
+    )
+
+    assert "45-60 seconds" in prompt
+    assert "at least 5 scenes" in prompt
+    assert ".env" in prompt
+    assert "secret" in prompt.lower()
+    assert "concrete repo evidence" in prompt.lower()
 
 
 def test_parse_brief_handles_markdown_code_fences():

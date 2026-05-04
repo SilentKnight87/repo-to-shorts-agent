@@ -12,6 +12,9 @@ from PIL import Image, ImageDraw, ImageFilter, ImageFont
 DEFAULT_WIDTH = 1080
 DEFAULT_HEIGHT = 1920
 DEFAULT_FPS = 30
+SAFE_FILE_PREFIXES = ("src/", "tests/", "docs/")
+SAFE_FILE_NAMES = {"README.md", "pyproject.toml", "package.json"}
+SECRET_FILE_MARKERS = (".env", "secret", "token", "private", "id_rsa", ".pem", ".key")
 
 STYLES: dict[str, dict[str, str]] = {
     "dark-terminal": {
@@ -117,6 +120,19 @@ def _slug_label(value: str) -> str:
     return value.replace("/", " › ").replace("_", " ").title()[:42]
 
 
+def _safe_key_files(key_files: list[str], limit: int = 10) -> list[str]:
+    safe = []
+    for path in key_files:
+        lowered = path.lower()
+        if lowered.startswith("runs/") or any(marker in lowered for marker in SECRET_FILE_MARKERS):
+            continue
+        if path in SAFE_FILE_NAMES or path.startswith(SAFE_FILE_PREFIXES):
+            safe.append(path)
+        if len(safe) >= limit:
+            break
+    return safe
+
+
 def _caption_chunks(text: str, words_per_chunk: int = 3) -> list[str]:
     words = [word.strip() for word in (text or "").replace("\n", " ").split() if word.strip()]
     if not words:
@@ -174,7 +190,7 @@ def generate_manim_script(scene: dict[str, Any], repo_analysis: dict[str, Any], 
         "repo_name": repo_analysis.get("name") or repo_analysis.get("repo_name") or "Repository",
         "description": repo_analysis.get("description", ""),
         "components": repo_analysis.get("components", []),
-        "key_files": repo_analysis.get("key_files", []),
+        "key_files": _safe_key_files(repo_analysis.get("key_files", [])),
         "primary_language": repo_analysis.get("primary_language", ""),
         "scenes": scene.get("scenes", []),
     }
