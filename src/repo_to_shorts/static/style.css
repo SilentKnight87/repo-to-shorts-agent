@@ -1320,6 +1320,40 @@ main.shell-main {
   line-height: 1.55;
 }
 
+.hero .skill-badge {
+  font-family: var(--font-mono);
+  font-size: var(--fs-11);
+  color: var(--ink-3);
+  max-width: 56ch;
+  margin: var(--sp-3) 0 0;
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  flex-wrap: wrap;
+  letter-spacing: var(--track-mid);
+}
+
+.hero .skill-badge code {
+  font-family: var(--font-mono);
+  color: var(--ink);
+  background: var(--panel-2);
+  padding: 0.1em 0.45em;
+  border: 1px solid var(--ink-4);
+  border-radius: 2px;
+}
+
+.hero .skill-badge__chip {
+  font-family: var(--font-display);
+  font-size: var(--fs-10);
+  letter-spacing: var(--track-wide);
+  color: var(--lock);
+  background: transparent;
+  border: 1px solid var(--lock);
+  padding: 0.15em 0.5em;
+  border-radius: 2px;
+  text-transform: uppercase;
+}
+
 /* HOME deck-control: form layout inside the deck */
 .deck-control {
   display: grid;

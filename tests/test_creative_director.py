@@ -107,6 +107,52 @@ def test_final_director_prompt_requires_postable_duration_and_secret_filtering()
     assert "concrete repo evidence" in prompt.lower()
 
 
+def test_final_director_prompt_requests_remotion_scene_contract():
+    prompt = _build_director_prompt(
+        {
+            "repo_name": "repo-to-shorts",
+            "description": "Turns repos into shorts",
+            "key_files": ["README.md", "src/repo_to_shorts/pipeline.py"],
+            "components": ["CLI", "Kimi", "Renderer"],
+        },
+        final=True,
+    )
+
+    assert "schema_version" in prompt
+    assert "ColdOpen" in prompt
+    assert "PipelineMap" in prompt
+    assert "ArtifactStack" in prompt
+    assert "LiveProof" in prompt
+    assert "CTAEndCard" in prompt
+    assert "evidence" in prompt
+    assert "caption_emphasis" in prompt
+    assert "Do not make generic architecture slides" in prompt
+
+
+def test_parse_brief_accepts_storyboard_contract():
+    raw = json.dumps({
+        "schema_version": 1,
+        "creative_direction": {"angle": "meta demo"},
+        "storyboard": [
+            {
+                "type": "ColdOpen",
+                "duration_seconds": 3,
+                "headline": "This repo made the video.",
+                "narration": "This repo made the video.",
+                "evidence": ["repo_name"],
+                "caption_emphasis": ["repo", "video"],
+            }
+        ],
+        "music_mood": "electronic",
+        "total_duration": 45,
+    })
+    result = _parse_brief(raw)
+    assert result.scenes[0]["type"] == "ColdOpen"
+    assert result.scenes[0]["headline"] == "This repo made the video."
+    assert result.scenes[0]["evidence"] == ["repo_name"]
+    assert result.scenes[0]["visual_tool"] == "pretext"
+
+
 def test_parse_brief_handles_markdown_code_fences():
     raw = """```json
 {

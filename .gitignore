@@ -12,3 +12,4 @@ build/
 !.env.example
 .superpowers/
 .worktrees/
+tweets-draft.md

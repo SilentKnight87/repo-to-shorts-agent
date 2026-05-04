@@ -92,14 +92,63 @@ Creative rules:
 - For this app specifically, emphasize the meta demo: the app generates the video that presents the app.
 """
     if final:
-        prompt += """
+        prompt = f"""You are an elite creative director making a hackathon demo video that must feel like Runway/Linear, not a generated slideshow.
+Your job is to convert code evidence into a sharp 45-60 second vertical short with a real point of view.
+
+REPO: {analysis.get('repo_name')}
+DESCRIPTION: {analysis.get('description', '')}
+LANGUAGE: {analysis.get('primary_language', '')}
+KEY_FILES: {analysis.get('key_files', [])}
+COMPONENTS: {analysis.get('components', [])}
+PURPOSE: {analysis.get('purpose', '')}
+AUDIENCE: technical builders, hackathon judges, AI agent people
+
+Output valid JSON only as a root object with this exact schema:
+{{
+  "schema_version": 1,
+  "creative_direction": {{
+    "angle": "meta demo",
+    "tone": "sharp, cinematic, builder-focused",
+    "visual_style": "retro-futuristic editorial"
+  }},
+  "storyboard": [
+    {{
+      "type": "ColdOpen",
+      "duration_seconds": 3,
+      "headline": "This repo made the video you're watching.",
+      "narration": "This repo made the video you're watching.",
+      "evidence": ["repo_name"],
+      "caption_emphasis": ["repo", "video"]
+    }}
+  ],
+  "quality_bar": {{
+    "avoid": ["generic architecture slide", "bottom caption box", "fake proof"],
+    "must_show": ["live Kimi proof", "generated MP4", "repo evidence"]
+  }},
+  "music_mood": "electronic|orchestral|minimal",
+  "total_duration": 45
+}}
+
+Scene type vocabulary (use these exact type names):
+- ColdOpen: 1.5-3s, huge kinetic hook, product clear in one glance.
+- RepoEvidence: repo name, purpose, key files, language/framework when available.
+- PainPoint: fast text beat about demo-making friction.
+- PipelineMap: ingest -> Kimi brief -> render -> artifacts.
+- ArtifactStack: repo brief, storyboard, narration, captions, MP4, metadata, submission copy.
+- LiveProof: highlight metadata.json Kimi fields and render validation.
+- DemoPreview: stylized browser/phone preview of the generated package or MP4.
+- CTAEndCard: command, output folder, final promise.
+
 Final export constraints:
 - Total runtime must be 45-60 seconds.
-- Use at least 5 scenes.
+- Use at least 5 scenes and at most 8 scenes.
 - Use concrete repo evidence from KEY_FILES and COMPONENTS.
 - Do not include .env, secret, token, private key, credential, or generated run files in visual evidence or narration.
 - Make the first 3 seconds understandable without audio.
 - Include a final CTA suitable for a hackathon submission.
+- Every scene must have one primary visual idea.
+- Every claim must connect to repo evidence, generated artifact evidence, or metadata proof.
+- Do not make generic architecture slides, floating cards for their own sake, dark blob backgrounds, or repeated architecture slides.
 """
     return prompt
 
@@ -144,6 +193,18 @@ def _deterministic_fallback(
     )
 
 
+_SCENE_TYPE_TO_VISUAL_TOOL: dict[str, str] = {
+    "coldopen": "pretext",
+    "repoevidence": "svg",
+    "painpoint": "ascii",
+    "pipelinemap": "svg",
+    "artifactstack": "ascii",
+    "liveproof": "manim",
+    "demopreview": "manim",
+    "ctaendcard": "pretext",
+}
+
+
 def _parse_brief(content: str) -> CreativeBrief:
     """Parse JSON response from Kimi into CreativeBrief."""
     # Handle possible markdown code fences
@@ -157,11 +218,13 @@ def _parse_brief(content: str) -> CreativeBrief:
     text = text.strip()
 
     data = _loads_brief_json(text)
+    raw_scenes = data.get("storyboard") or data.get("scenes", [])
+    scenes = [_normalize_scene(scene) for scene in raw_scenes]
     return CreativeBrief(
         style=data.get("style", "dark-terminal"),
         title=data.get("title", "Untitled"),
         hook=data.get("hook", ""),
-        scenes=data.get("scenes", []),
+        scenes=scenes,
         music_mood=data.get("music_mood", "ambient"),
         total_duration=data.get("total_duration", 60),
         mode=data.get("mode", "deterministic-fallback"),
@@ -169,6 +232,22 @@ def _parse_brief(content: str) -> CreativeBrief:
         model=data.get("model", "moonshotai/kimi-k2.6"),
         fallback_reason=data.get("fallback_reason"),
     )
+
+
+def _normalize_scene(scene: dict) -> dict:
+    """Normalize a scene dict from old or new schema into a unified shape."""
+    normalized = dict(scene)
+    # Ensure new fields exist
+    normalized.setdefault("type", normalized.get("visual_tool", "statement").title())
+    normalized.setdefault("headline", normalized.get("hook", ""))
+    normalized.setdefault("evidence", [])
+    normalized.setdefault("caption_emphasis", [])
+    # Ensure backward-compatible fields exist for manim renderer
+    scene_type = str(normalized.get("type", "")).lower()
+    normalized.setdefault("visual_tool", _SCENE_TYPE_TO_VISUAL_TOOL.get(scene_type, "pretext"))
+    normalized.setdefault("transition", "fade")
+    normalized.setdefault("music_mood", "tension")
+    return normalized
 
 
 def _loads_brief_json(text: str) -> dict:

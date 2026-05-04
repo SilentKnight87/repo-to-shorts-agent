@@ -124,6 +124,7 @@ def render_home_page(runs: list[Path], message: str | None = None) -> str:
   <div class="kicker">// SIGNAL IN. STORY OUT.</div>
   <h1 class="glitch-headline" data-glitch>REPO &rarr; REEL.</h1>
   <p class="lede">Paste a repo. Kimi writes the brief. Hermes cuts the reel.</p>
+  <p class="skill-badge"><span class="skill-badge__chip">SKILL</span> Same workflow as <code>hermes</code> &rarr; <code>/repo-shorts-creative &lt;target&gt;</code></p>
   {message_html}
 </section>
 <form id="generate-form" class="deck deck-control" method="POST" action="/generate">

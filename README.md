@@ -12,7 +12,29 @@ Turn any GitHub repo into a 60-second animated creative short. Built for the Nou
 4. **TTS narration** (macOS `say`) reads the script and gets mixed into the video
 5. **Output:** a 1080×1920 vertical MP4, ready to post
 
-All of this happens in one click through the browser.
+All of this happens in one click through the browser, or via a single command in a Hermes Agent session.
+
+## Hermes Agent skill
+
+Repo-to-Shorts ships as a Hermes Agent skill — `~/.hermes/skills/video/repo-shorts-creative/SKILL.md`. Inside an interactive `hermes` REPL, the agent reads the skill, decides to invoke its terminal toolset, runs the underlying CLI, and validates the live Kimi proof in `metadata.json` before declaring success.
+
+```bash
+hermes
+> /repo-shorts-creative https://github.com/SilentKnight87/repo-to-shorts-agent
+```
+
+Or in natural language: *"Make a launch short for this repo: https://…"*
+
+The skill is the boundary. Hermes Agent is the agentic operator. Repo-to-Shorts is the workflow that gets invoked. Kimi K2.6 is the model behind Hermes (configured in `~/.hermes/config.yaml`) and the creative director inside the Repo-to-Shorts pipeline. Two layers of Kimi, one Hermes loop.
+
+### Install the skill (one time)
+
+```bash
+mkdir -p ~/.hermes/skills/video/repo-shorts-creative
+cp .hermes/skill/SKILL.md ~/.hermes/skills/video/repo-shorts-creative/SKILL.md
+```
+
+(Or symlink if you'd rather edit in place.)
 
 ## Web UI (primary interface)
 
@@ -68,23 +90,31 @@ repo-shorts analyze https://github.com/owner/repo --out runs --render mp4
 ## Architecture
 
 ```
-GitHub URL
-    |
-    v
-[ Ingest ]  -> README, file tree, metadata, git log
-    |
-    v
-[ Creative Director ]  -> Kimi 2.6 designs brief (style, scenes, narration)
-    |
-    v
-[ Renderer ]  -> Pillow generates 1800 animated frames (60s @ 30fps)
-    |              gradients, fades, typewriter, component reveals
-    v
-[ Compositor ]  -> ffmpeg stitches frames + TTS narration -> demo.mp4
-    |
-    v
-[ Metadata ]  -> metadata.json proves Kimi mode + creative brief
+[ Hermes Agent (REPL) ]  -> reads SKILL.md, decides to invoke terminal tool
+                         |
+                         v
+                    GitHub URL
+                         |
+                         v
+                  [ Ingest ]  -> README, file tree, metadata, git log
+                         |
+                         v
+        [ Creative Director ]  -> Kimi 2.6 designs brief (style, scenes, narration)
+                         |
+                         v
+                 [ Renderer ]  -> Pillow / Remotion generates 1080×1920 @ 30fps
+                         |              gradients, fades, typewriter, component reveals
+                         v
+              [ Compositor ]  -> ffmpeg stitches frames + TTS narration -> demo.mp4
+                         |
+                         v
+                [ Metadata ]  -> metadata.json proves Kimi mode + creative brief
+                         |
+                         v
+[ Hermes Agent ]  -> validates kimi.mode=live-api in metadata, returns submission_pack.md
 ```
+
+Outer loop: Hermes Agent. Inner loop: the Python CLI. Hermes invokes, validates, and reports — it never fakes the proof.
 
 ## Creative brief structure
 
@@ -150,17 +180,19 @@ repo-shorts web                      # start UI
 
 ## Hackathon submission
 
-**The meta demo:** Screen-record the web UI generating a creative short of the Repo-to-Shorts Agent repo itself. The submission video shows the app building a video of the app.
+**The meta demo:** Hermes Agent invokes the `repo-shorts-creative` skill on this repository. The skill drives a Kimi-directed creative pipeline that produces a video about itself. The submission video shows Hermes building a video of the repo Hermes is building it from.
 
 **Proof points:**
-1. Open web UI, paste `https://github.com/SilentKnight87/repo-to-shorts-agent`
-2. Click Generate
-3. Show creative brief appearing in real-time
-4. Play the generated `demo.mp4`
-5. Open `metadata.json` to show `kimi.mode: live-api` and full `creative_brief`
+1. Open `hermes` in a terminal, type `/repo-shorts-creative https://github.com/SilentKnight87/repo-to-shorts-agent`
+2. Show Hermes reading the skill, deciding to invoke `run_terminal_cmd`, and shelling out
+3. (Side-by-side) open the web UI, paste the same URL — same workflow, two surfaces
+4. Watch the VHS broadcast UI light up its channel rows as the pipeline runs
+5. Play the generated `demo.mp4`
+6. Open `metadata.json` — show `kimi.mode: live-api`, `kimi.provider: openrouter`, `kimi.model: moonshotai/kimi-k2.6`, `render.validation.ok: true`
+7. Show `submission_pack.md` — the Hermes orchestration proof section cites the skill path
 
 **What to submit:**
-- Demo video (screen recording of the web UI + generated MP4)
-- Short write-up explaining the agentic creative workflow
-- Tag @NousResearch, @KimiAI, and relevant parties
+- Demo video (≤60s, 9:16): split-track of Hermes terminal session and VHS browser UI
+- X post tagging `@NousResearch` and `@Kimi_Moonshot`
+- Discord drop in the Nous Research `creative-hackathon-submissions` channel
 - The repo itself (already public)

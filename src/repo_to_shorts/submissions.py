@@ -33,7 +33,9 @@ def write_submission_pack(
 
 ## Hermes Orchestration Proof
 
-- Hermes/operator command: `{command_text}`
+- Hermes Agent skill: `~/.hermes/skills/video/repo-shorts-creative/SKILL.md`
+- Skill invocation: `hermes` REPL → `/repo-shorts-creative <target>` (or natural language)
+- Underlying CLI command: `{command_text}`
 - Run directory: `{run_dir}`
 - Repo: `{repo_name}`
 - Kimi mode: `{kimi.get("mode", "unknown")}`
@@ -42,7 +44,7 @@ def write_submission_pack(
 - Media validation: `{validation_status}`
 - Demo MP4: `demo.mp4`
 
-Hermes orchestrated the workflow by running the CLI, inspecting the generated proof files, and preparing this package. Repo-to-Shorts produced the artifacts.
+Hermes Agent invokes the `repo-shorts-creative` skill, runs the underlying CLI, inspects the generated proof files (`metadata.json`, `demo.mp4`), validates Kimi usage, and assembles this submission package. Repo-to-Shorts produces the artifacts; Hermes is the agentic operator that drives the workflow.
 
 ## MP4 Validation
 
