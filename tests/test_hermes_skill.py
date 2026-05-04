@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
@@ -119,12 +120,116 @@ def test_run_creative_pipeline_success(
     run_dir = Path(result["run_dir"])
     metadata_path = run_dir / "metadata.json"
     assert metadata_path.exists()
-    import json
     metadata = json.loads(metadata_path.read_text())
     assert metadata["creative_brief"]["style"] == "dark-terminal"
     assert metadata["creative_brief"]["title"] == "Test Title"
     assert len(metadata["creative_brief"]["scenes"]) == 2
     assert metadata["kimi"]["model"] == "moonshotai/kimi-k2.6"
+
+
+@patch("repo_to_shorts.hermes_skill.write_submission_pack")
+@patch("repo_to_shorts.hermes_skill.validate_media")
+@patch("repo_to_shorts.hermes_skill.ingest_target")
+@patch("repo_to_shorts.hermes_skill.direct")
+@patch("repo_to_shorts.hermes_skill.generate_manim_script")
+@patch("repo_to_shorts.hermes_skill.render_scene")
+@patch("repo_to_shorts.hermes_skill._merge_creative_video")
+def test_run_creative_pipeline_final_writes_validation_submission_and_srt(
+    mock_merge,
+    mock_render,
+    mock_script,
+    mock_direct,
+    mock_ingest,
+    mock_validate,
+    mock_submission,
+    tmp_path: Path,
+):
+    mock_ingest.return_value = FakeSnapshot()
+    mock_direct.return_value = MagicMock(
+        style="dark-terminal",
+        title="Final Title",
+        hook="Final hook",
+        scenes=[
+            {"duration_seconds": 10, "narration": "Scene one."},
+            {"duration_seconds": 10, "narration": "Scene two."},
+            {"duration_seconds": 10, "narration": "Scene three."},
+            {"duration_seconds": 10, "narration": "Scene four."},
+            {"duration_seconds": 10, "narration": "Scene five."},
+        ],
+        music_mood="electronic",
+        total_duration=50,
+    )
+    mock_script.return_value = tmp_path / "script.json"
+    raw = tmp_path / "video.mp4"
+    raw.write_bytes(b"raw")
+    mock_render.return_value = raw
+    mock_validate.return_value = {"ok": True, "duration_seconds": 50, "resolution": "1080x1920", "has_audio": True, "errors": []}
+
+    result = run_creative_pipeline(
+        ".",
+        out_dir=tmp_path,
+        final=True,
+        tts_provider="xai",
+        fallback_tts_provider="openai",
+        voice="orpheus",
+        command=["repo-shorts", "creative", ".", "--final"],
+    )
+
+    run_dir = Path(result["run_dir"])
+    metadata = json.loads((run_dir / "metadata.json").read_text(encoding="utf-8"))
+
+    mock_direct.assert_called_once()
+    assert mock_direct.call_args.kwargs["final"] is True
+    mock_merge.assert_called_once()
+    assert mock_merge.call_args.kwargs["tts_provider"] == "xai"
+    assert mock_merge.call_args.kwargs["fallback_tts_provider"] == "openai"
+    assert mock_merge.call_args.kwargs["voice"] == "orpheus"
+    mock_validate.assert_called_once()
+    mock_submission.assert_called_once()
+    assert (run_dir / "captions.srt").exists()
+    assert metadata["render"]["final"] is True
+    assert metadata["render"]["validation"]["ok"] is True
+    assert metadata["tts"]["provider"] == "xai"
+    assert "captions.srt" in metadata["artifacts"]
+    assert "submission_pack.md" in metadata["artifacts"]
+
+
+@patch("repo_to_shorts.hermes_skill.validate_media")
+@patch("repo_to_shorts.hermes_skill.ingest_target")
+@patch("repo_to_shorts.hermes_skill.direct")
+@patch("repo_to_shorts.hermes_skill.generate_manim_script")
+@patch("repo_to_shorts.hermes_skill.render_scene")
+@patch("repo_to_shorts.hermes_skill._merge_creative_video")
+def test_run_creative_pipeline_final_fails_bad_validation(
+    mock_merge,
+    mock_render,
+    mock_script,
+    mock_direct,
+    mock_ingest,
+    mock_validate,
+    tmp_path: Path,
+):
+    mock_ingest.return_value = FakeSnapshot()
+    mock_direct.return_value = MagicMock(
+        style="dark-terminal",
+        title="Bad",
+        hook="Bad",
+        scenes=[{"duration_seconds": 10, "narration": "Scene."} for _ in range(5)],
+        music_mood="electronic",
+        total_duration=50,
+    )
+    mock_script.return_value = tmp_path / "script.json"
+    raw = tmp_path / "video.mp4"
+    raw.write_bytes(b"raw")
+    mock_render.return_value = raw
+    mock_validate.return_value = {"ok": False, "errors": ["audio stream is required"]}
+
+    try:
+        run_creative_pipeline(".", out_dir=tmp_path, final=True)
+    except RuntimeError as exc:
+        assert "audio stream is required" in str(exc)
+    else:
+        raise AssertionError("final mode should fail when validation fails")
 
 
 @patch("repo_to_shorts.hermes_skill.burn_karaoke_captions")

@@ -25,3 +25,13 @@ def test_creative_help_shows_options():
     assert "--kimi-model" in result.output
     assert "--music" in result.output
     assert "Generate a creative short" in result.output
+
+
+def test_creative_help_shows_final_tts_options():
+    result = runner.invoke(app, ["creative", "--help"])
+    assert result.exit_code == 0
+    assert "--final" in result.output
+    assert "--tts-provider" in result.output
+    assert "--fallback-tts-provider" in result.output
+    assert "--voice" in result.output
+    assert "--no-generated-music" in result.output

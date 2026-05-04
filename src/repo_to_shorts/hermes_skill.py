@@ -10,7 +10,9 @@ from repo_to_shorts.compositor import burn_karaoke_captions, generate_ambient_mu
 from repo_to_shorts.creative_director import direct
 from repo_to_shorts.ingest import ingest_target
 from repo_to_shorts.manim_render import generate_manim_script, render_scene
+from repo_to_shorts.media_validation import validate_media
 from repo_to_shorts.progress import ProgressTracker
+from repo_to_shorts.submissions import write_submission_pack
 
 SAFE_FILE_PREFIXES = (
     "src/",
@@ -39,6 +41,12 @@ def run_creative_pipeline(
     session_id: str | None = None,
     preview: bool = False,
     skip_audio: bool = False,
+    final: bool = False,
+    tts_provider: str = "edge",
+    fallback_tts_provider: str | None = None,
+    voice: str | None = None,
+    generated_music: bool = True,
+    command: list[str] | None = None,
 ) -> dict:
     """Full creative pipeline: ingest → Kimi creative director → render → compose.
 
@@ -46,6 +54,9 @@ def run_creative_pipeline(
     """
     if session_id:
         ProgressTracker.create_session(session_id)
+    if final:
+        preview = False
+        skip_audio = tts_provider == "none"
 
     def _start(stage: str, detail: str = "") -> None:
         if session_id:
@@ -69,7 +80,7 @@ def run_creative_pipeline(
         _complete("analyze", f"Analyzed {repo_analysis.get('repo_name', 'repo')}")
 
         _start("kimi_brief", "Calling creative director")
-        brief = direct(repo_analysis, model=kimi_model or "moonshotai/kimi-k2.6")
+        brief = direct(repo_analysis, model=kimi_model or "moonshotai/kimi-k2.6", final=final)
         if preview:
             brief.scenes = _preview_scenes(brief.scenes)
             brief.total_duration = int(sum(float(scene.get("duration_seconds", 4)) for scene in brief.scenes))
@@ -93,16 +104,32 @@ def run_creative_pipeline(
             video_path = raw_video
         _complete("render_frames", f"Rendered {len(brief.scenes)} scenes")
 
+        captions_path = _write_captions_srt(brief.scenes, run_dir / "captions.srt")
+
         _start("tts", "Generating narration")
         final_video = run_dir / "demo.mp4"
         if skip_audio:
             _copy_video(video_path, final_video)
         else:
-            _merge_creative_video(video_path, brief.scenes, final_video, music_path=music_path)
+            _merge_creative_video(
+                video_path,
+                brief.scenes,
+                final_video,
+                music_path=music_path,
+                tts_provider=tts_provider,
+                fallback_tts_provider=fallback_tts_provider,
+                voice=voice,
+                generated_music=generated_music,
+            )
         _complete("tts", "Skipped audio for preview" if skip_audio else f"Generated voice for {len(brief.scenes)} scenes")
 
         _start("compose", "Mixing audio and video")
         _complete("compose", "Video composed")
+
+        validation = validate_media(final_video, require_audio=not skip_audio)
+        if final and not validation.get("ok"):
+            errors = validation.get("errors") or ["media validation failed"]
+            raise RuntimeError("; ".join(errors))
 
         _start("finalize", "Writing metadata")
         metadata = {
@@ -124,6 +151,12 @@ def run_creative_pipeline(
                 "model": kimi_model or "moonshotai/kimi-k2.6",
                 "provider": "openrouter",
             },
+            "tts": {
+                "provider": tts_provider,
+                "fallback_provider": fallback_tts_provider,
+                "voice": voice,
+                "skipped": skip_audio,
+            },
             "render": {
                 "mode": "mp4",
                 "renderer": "pillow+ffmpeg-enhanced",
@@ -131,12 +164,22 @@ def run_creative_pipeline(
                 "scene_count": len(brief.scenes),
                 "preview": preview,
                 "audio": "skipped" if skip_audio else "tts+generated-music",
+                "final": final,
+                "validation": validation,
             },
             "artifacts": [
                 "demo.mp4",
+                captions_path.name,
+                "submission_pack.md",
                 "metadata.json",
             ],
         }
+        write_submission_pack(
+            run_dir,
+            command=command or ["repo-shorts", "creative", target],
+            metadata=metadata,
+            validation=validation,
+        )
         (run_dir / "metadata.json").write_text(json.dumps(metadata, indent=2) + "\n", encoding="utf-8")
         _complete("finalize", "Artifacts packaged")
 
@@ -165,6 +208,31 @@ def _copy_video(video_path: Path, output_path: Path) -> Path:
         text=True,
     )
     return output_path
+
+
+def _write_captions_srt(scenes: list[dict], output_path: Path) -> Path:
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    current_time = 0.0
+    blocks: list[str] = []
+    for index, scene in enumerate(scenes, start=1):
+        duration = float(scene.get("duration_seconds", 10))
+        narration = str(scene.get("narration", "")).strip()
+        start = current_time
+        end = current_time + duration
+        current_time = end
+        if not narration:
+            continue
+        blocks.append(f"{index}\n{_srt_timestamp(start)} --> {_srt_timestamp(end)}\n{narration}")
+    output_path.write_text("\n\n".join(blocks) + ("\n" if blocks else ""), encoding="utf-8")
+    return output_path
+
+
+def _srt_timestamp(seconds: float) -> str:
+    milliseconds = int(round(seconds * 1000))
+    hours, remainder = divmod(milliseconds, 3_600_000)
+    minutes, remainder = divmod(remainder, 60_000)
+    secs, millis = divmod(remainder, 1000)
+    return f"{hours:02d}:{minutes:02d}:{secs:02d},{millis:03d}"
 
 
 def _build_repo_analysis(snapshot) -> dict:
@@ -201,6 +269,10 @@ def _merge_creative_video(
     scenes: list[dict],
     output_path: Path,
     music_path: Path | None = None,
+    tts_provider: str = "edge",
+    fallback_tts_provider: str | None = None,
+    voice: str | None = None,
+    generated_music: bool = True,
 ) -> Path:
     """Merge narrations (TTS), optional/generated music, and karaoke captions into the rendered video."""
     output_path = output_path.resolve()
@@ -216,7 +288,13 @@ def _merge_creative_video(
             scene_durations.append(float(duration))
             if narration:
                 tts_path = tmpdir / f"tts_{i:02d}.wav"
-                generate_tts(narration, tts_path)
+                generate_tts(
+                    narration,
+                    tts_path,
+                    provider=tts_provider,
+                    fallback_provider=fallback_tts_provider,
+                    voice=voice,
+                )
                 tts_files.append(str(tts_path.resolve()))
 
         if not tts_files:
@@ -243,8 +321,11 @@ def _merge_creative_video(
         # Generate ambient music if none provided
         total_duration = max(1, int(round(sum(scene_durations))))
         if music_path is None or not music_path.exists():
-            music_path = tmpdir / "ambient_music.mp3"
-            generate_ambient_music(music_path, duration=max(total_duration, 30))
+            if generated_music:
+                music_path = tmpdir / "ambient_music.mp3"
+                generate_ambient_music(music_path, duration=max(total_duration, 30))
+            else:
+                music_path = None
 
         # Mix voice + music
         mixed_audio = tmpdir / "mixed.aac"
