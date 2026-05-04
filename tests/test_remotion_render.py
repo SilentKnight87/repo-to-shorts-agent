@@ -11,6 +11,7 @@ from repo_to_shorts.remotion_render import (
     render_remotion_video,
     write_remotion_input,
 )
+from repo_to_shorts.render import RenderConfig
 
 
 def test_build_remotion_input_contains_repo_proof_scenes_and_artifacts():
@@ -365,3 +366,30 @@ def test_render_remotion_video_returns_failure_when_output_is_missing(
     assert result.renderer == "remotion"
     assert result.scene_count == 1
     assert result.error == "Remotion render did not create demo.mp4"
+
+
+def test_render_remotion_video_missing_output_error_names_configured_output(
+    monkeypatch,
+    tmp_path: Path,
+):
+    monkeypatch.setattr(
+        "repo_to_shorts.remotion_render.subprocess.run",
+        lambda command, cwd, check, capture_output, text: subprocess.CompletedProcess(command, 0, "", ""),
+    )
+    monkeypatch.setattr(
+        "repo_to_shorts.remotion_render.remotion_available",
+        lambda project_root=None: True,
+    )
+
+    result = render_remotion_video(
+        tmp_path,
+        [{"type": "ColdOpen", "headline": "Hook", "narration": "Hook."}],
+        repo_name="repo",
+        description="Description",
+        key_files=[],
+        proof={},
+        config=RenderConfig(output_name="video_raw.mp4"),
+    )
+
+    assert result.output_path is None
+    assert result.error == "Remotion render did not create video_raw.mp4"

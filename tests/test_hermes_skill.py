@@ -5,6 +5,7 @@ from pathlib import Path
 from unittest.mock import MagicMock, patch
 
 from repo_to_shorts.hermes_skill import _build_repo_analysis, _merge_creative_video, run_creative_pipeline
+from repo_to_shorts.render import RenderResult
 
 
 class FakeSnapshot:
@@ -13,6 +14,28 @@ class FakeSnapshot:
     package_metadata = {"description": "A test repo", "language": "Python"}
     file_tree = ["src/app.py", "src/core.py", "README.md"]
     readme = "# Test Repo\n\nThis is a test."
+
+
+def _final_brief(**overrides):
+    values = {
+        "style": "dark-terminal",
+        "title": "Final Title",
+        "hook": "Final hook",
+        "scenes": [
+            {"duration_seconds": 10, "narration": "Scene one."},
+            {"duration_seconds": 10, "narration": "Scene two."},
+            {"duration_seconds": 10, "narration": "Scene three."},
+            {"duration_seconds": 10, "narration": "Scene four."},
+            {"duration_seconds": 10, "narration": "Scene five."},
+        ],
+        "music_mood": "electronic",
+        "total_duration": 50,
+        "mode": "live-api",
+        "provider": "openrouter",
+        "model": "moonshotai/kimi-k2.6",
+    }
+    values.update(overrides)
+    return MagicMock(**values)
 
 
 def test_build_repo_analysis():
@@ -153,8 +176,14 @@ def test_run_creative_pipeline_final_writes_validation_submission_and_srt(
     mock_ingest,
     mock_validate,
     mock_submission,
+    monkeypatch,
     tmp_path: Path,
 ):
+    monkeypatch.setattr(
+        "repo_to_shorts.hermes_skill.render_remotion_video",
+        lambda *args, **kwargs: RenderResult(None, "mp4", "remotion", 5, "Remotion unavailable"),
+        raising=False,
+    )
     mock_ingest.return_value = FakeSnapshot()
     mock_direct.return_value = MagicMock(
         style="dark-terminal",
@@ -205,6 +234,169 @@ def test_run_creative_pipeline_final_writes_validation_submission_and_srt(
     assert "submission_pack.md" in metadata["artifacts"]
     assert mock_submission.call_args.kwargs["metadata"] == metadata
     assert mock_submission.call_args.kwargs["validation"] is mock_validate.return_value
+
+
+@patch("repo_to_shorts.hermes_skill.write_submission_pack")
+@patch("repo_to_shorts.hermes_skill.validate_media")
+@patch("repo_to_shorts.hermes_skill.ingest_target")
+@patch("repo_to_shorts.hermes_skill.direct")
+@patch("repo_to_shorts.hermes_skill.generate_manim_script")
+@patch("repo_to_shorts.hermes_skill.render_scene")
+@patch("repo_to_shorts.hermes_skill._merge_creative_video")
+def test_run_creative_pipeline_final_uses_successful_remotion_raw_video(
+    mock_merge,
+    mock_render,
+    mock_script,
+    mock_direct,
+    mock_ingest,
+    mock_validate,
+    mock_submission,
+    monkeypatch,
+    tmp_path: Path,
+):
+    raw_remotion = tmp_path / "remotion-video_raw.mp4"
+    raw_remotion.write_bytes(b"remotion")
+    remotion_call = {}
+
+    def fake_remotion(run_dir, scenes, **kwargs):
+        remotion_call["run_dir"] = run_dir
+        remotion_call["scenes"] = scenes
+        remotion_call["kwargs"] = kwargs
+        return RenderResult(raw_remotion, "mp4", "remotion", len(scenes), None)
+
+    monkeypatch.setattr(
+        "repo_to_shorts.hermes_skill.render_remotion_video",
+        fake_remotion,
+        raising=False,
+    )
+    mock_ingest.return_value = FakeSnapshot()
+    mock_direct.return_value = _final_brief()
+    mock_validate.return_value = {"ok": True, "duration_seconds": 50, "has_audio": True, "errors": []}
+
+    result = run_creative_pipeline(".", out_dir=tmp_path, final=True)
+
+    run_dir = Path(result["run_dir"])
+    metadata = json.loads((run_dir / "metadata.json").read_text(encoding="utf-8"))
+
+    mock_script.assert_not_called()
+    mock_render.assert_not_called()
+    mock_merge.assert_called_once()
+    assert mock_merge.call_args.args[0] == raw_remotion
+    assert mock_merge.call_args.args[2] == run_dir / "demo.mp4"
+    assert metadata["render"]["renderer"] == "remotion"
+    assert metadata["render"]["input"] == "render/remotion_input.json"
+    assert metadata["render"]["output"] == "demo.mp4"
+    assert metadata["render"]["scene_count"] == 5
+    assert metadata["render"]["final"] is True
+    assert metadata["render"]["validation"] == mock_validate.return_value
+    assert remotion_call["run_dir"] == run_dir
+    assert remotion_call["kwargs"]["config"].output_name == "video_raw.mp4"
+    assert remotion_call["kwargs"]["proof"] == {
+        "kimi_mode": "live-api",
+        "kimi_provider": "openrouter",
+        "kimi_model": "moonshotai/kimi-k2.6",
+    }
+    assert mock_submission.call_args.kwargs["metadata"] == metadata
+
+
+@patch("repo_to_shorts.hermes_skill.write_submission_pack")
+@patch("repo_to_shorts.hermes_skill.validate_media")
+@patch("repo_to_shorts.hermes_skill.ingest_target")
+@patch("repo_to_shorts.hermes_skill.direct")
+@patch("repo_to_shorts.hermes_skill.generate_manim_script")
+@patch("repo_to_shorts.hermes_skill.render_scene")
+@patch("repo_to_shorts.hermes_skill._merge_creative_video")
+def test_run_creative_pipeline_final_falls_back_when_remotion_fails(
+    mock_merge,
+    mock_render,
+    mock_script,
+    mock_direct,
+    mock_ingest,
+    mock_validate,
+    mock_submission,
+    monkeypatch,
+    tmp_path: Path,
+):
+    def fake_remotion(run_dir, scenes, **kwargs):
+        (Path(run_dir) / "render").mkdir(parents=True, exist_ok=True)
+        (Path(run_dir) / "render" / "remotion_input.json").write_text("{}", encoding="utf-8")
+        return RenderResult(None, "mp4", "remotion", len(scenes), "boom")
+
+    monkeypatch.setattr(
+        "repo_to_shorts.hermes_skill.render_remotion_video",
+        fake_remotion,
+        raising=False,
+    )
+    mock_ingest.return_value = FakeSnapshot()
+    mock_direct.return_value = _final_brief()
+    mock_script.return_value = tmp_path / "script.json"
+    raw = tmp_path / "video.mp4"
+    raw.write_bytes(b"raw")
+    mock_render.return_value = raw
+    mock_validate.return_value = {"ok": True, "duration_seconds": 50, "has_audio": True, "errors": []}
+
+    result = run_creative_pipeline(".", out_dir=tmp_path, final=True)
+
+    run_dir = Path(result["run_dir"])
+    metadata = json.loads((run_dir / "metadata.json").read_text(encoding="utf-8"))
+
+    mock_script.assert_called_once()
+    mock_render.assert_called_once()
+    mock_merge.assert_called_once()
+    assert mock_merge.call_args.args[0] == run_dir / "video_raw.mp4"
+    assert metadata["render"]["renderer"] == "pillow+ffmpeg-enhanced"
+    assert metadata["render"]["fallback_renderer"] == "remotion"
+    assert metadata["render"]["fallback_reason"] == "boom"
+    assert metadata["render"]["input"] == "render/remotion_input.json"
+    assert mock_submission.call_args.kwargs["metadata"] == metadata
+
+
+@patch("repo_to_shorts.hermes_skill.write_submission_pack")
+@patch("repo_to_shorts.hermes_skill.validate_media")
+@patch("repo_to_shorts.hermes_skill.ingest_target")
+@patch("repo_to_shorts.hermes_skill.direct")
+@patch("repo_to_shorts.hermes_skill.generate_manim_script")
+@patch("repo_to_shorts.hermes_skill.render_scene")
+@patch("repo_to_shorts.hermes_skill._copy_video")
+@patch("repo_to_shorts.hermes_skill._merge_creative_video")
+def test_run_creative_pipeline_final_tts_none_copies_remotion_raw_video(
+    mock_merge,
+    mock_copy,
+    mock_render,
+    mock_script,
+    mock_direct,
+    mock_ingest,
+    mock_validate,
+    mock_submission,
+    monkeypatch,
+    tmp_path: Path,
+):
+    raw_remotion = tmp_path / "remotion-video_raw.mp4"
+    raw_remotion.write_bytes(b"remotion")
+    monkeypatch.setattr(
+        "repo_to_shorts.hermes_skill.render_remotion_video",
+        lambda run_dir, scenes, **kwargs: RenderResult(raw_remotion, "mp4", "remotion", len(scenes), None),
+        raising=False,
+    )
+    mock_ingest.return_value = FakeSnapshot()
+    mock_direct.return_value = _final_brief()
+    mock_validate.return_value = {"ok": True, "duration_seconds": 50, "has_audio": False, "errors": []}
+
+    result = run_creative_pipeline(".", out_dir=tmp_path, final=True, tts_provider="none")
+
+    run_dir = Path(result["run_dir"])
+    metadata = json.loads((run_dir / "metadata.json").read_text(encoding="utf-8"))
+
+    mock_script.assert_not_called()
+    mock_render.assert_not_called()
+    mock_merge.assert_not_called()
+    mock_copy.assert_called_once_with(raw_remotion, run_dir / "demo.mp4")
+    assert raw_remotion != run_dir / "demo.mp4"
+    mock_validate.assert_called_once_with(Path(result["output"]), require_audio=False)
+    assert metadata["tts"]["skipped"] is True
+    assert metadata["render"]["renderer"] == "remotion"
+    assert metadata["render"]["audio"] == "skipped"
+    assert mock_submission.call_args.kwargs["metadata"] == metadata
 
 
 @patch("repo_to_shorts.hermes_skill.write_submission_pack")
@@ -319,8 +511,14 @@ def test_run_creative_pipeline_final_tts_none_copies_video_and_validates_without
     mock_ingest,
     mock_validate,
     mock_submission,
+    monkeypatch,
     tmp_path: Path,
 ):
+    monkeypatch.setattr(
+        "repo_to_shorts.hermes_skill.render_remotion_video",
+        lambda *args, **kwargs: RenderResult(None, "mp4", "remotion", 5, "Remotion unavailable"),
+        raising=False,
+    )
     mock_ingest.return_value = FakeSnapshot()
     mock_direct.return_value = MagicMock(
         style="dark-terminal",
@@ -363,8 +561,14 @@ def test_run_creative_pipeline_final_fails_bad_validation(
     mock_direct,
     mock_ingest,
     mock_validate,
+    monkeypatch,
     tmp_path: Path,
 ):
+    monkeypatch.setattr(
+        "repo_to_shorts.hermes_skill.render_remotion_video",
+        lambda *args, **kwargs: RenderResult(None, "mp4", "remotion", 5, "Remotion unavailable"),
+        raising=False,
+    )
     mock_ingest.return_value = FakeSnapshot()
     mock_direct.return_value = MagicMock(
         style="dark-terminal",

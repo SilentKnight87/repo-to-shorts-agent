@@ -144,7 +144,7 @@ def render_remotion_video(
             mode="mp4",
             renderer="remotion",
             scene_count=scene_count,
-            error="Remotion render did not create demo.mp4",
+            error=f"Remotion render did not create {output_path.name}",
         )
     return RenderResult(
         output_path=output_path,
