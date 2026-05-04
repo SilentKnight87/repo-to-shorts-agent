@@ -512,6 +512,61 @@ def test_merge_creative_video_with_narration_avoids_duplicate_caption_burn(
     assert final_remux_args[-1] == str(output.resolve())
 
 
+@patch("repo_to_shorts.hermes_skill.mix_audio")
+@patch("repo_to_shorts.hermes_skill.generate_ambient_music")
+@patch("repo_to_shorts.hermes_skill.generate_tts")
+@patch("repo_to_shorts.hermes_skill.subprocess.run")
+def test_merge_creative_video_preserves_silent_scene_timing(
+    mock_run,
+    mock_tts,
+    mock_generate_music,
+    mock_mix_audio,
+    monkeypatch,
+    tmp_path: Path,
+):
+    video = tmp_path / "video.mp4"
+    video.write_text("fake video")
+    output = tmp_path / "out.mp4"
+
+    scenes = [
+        {"narration": "Opening", "duration_seconds": 2},
+        {"narration": "", "duration_seconds": 4},
+        {"narration": "Closing", "duration_seconds": 3},
+    ]
+
+    persistent_tmp = tmp_path / "merge-tmp"
+
+    class PersistentTemporaryDirectory:
+        def __enter__(self):
+            persistent_tmp.mkdir(parents=True, exist_ok=True)
+            return str(persistent_tmp)
+
+        def __exit__(self, *args):
+            return False
+
+    monkeypatch.setattr(
+        "repo_to_shorts.hermes_skill.tempfile.TemporaryDirectory",
+        lambda: PersistentTemporaryDirectory(),
+    )
+
+    _merge_creative_video(video, scenes, output)
+
+    assert mock_tts.call_count == 2
+    mock_generate_music.assert_called_once()
+    assert mock_mix_audio.call_args.kwargs["duration_seconds"] == 9
+
+    commands = [call.args[0] for call in mock_run.call_args_list]
+    silence_commands = [cmd for cmd in commands if "anullsrc=channel_layout=stereo:sample_rate=44100" in cmd]
+    assert len(silence_commands) == 1
+    assert "-t" in silence_commands[0]
+    assert "4.000" in silence_commands[0]
+
+    concat_text = (persistent_tmp / "tts_concat.txt").read_text(encoding="utf-8")
+    assert "tts_aligned_00.wav" in concat_text
+    assert "tts_silence_01.wav" in concat_text
+    assert "tts_aligned_02.wav" in concat_text
+
+
 @patch("repo_to_shorts.hermes_skill.subprocess.run")
 def test_merge_creative_video_no_narration(mock_run, tmp_path: Path):
     video = tmp_path / "video.mp4"

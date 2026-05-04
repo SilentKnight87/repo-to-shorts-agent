@@ -334,8 +334,9 @@ def _merge_creative_video(
         tts_files: list[str] = []
         scene_durations: list[float] = []
         used_providers: list[str] = []
+        has_any_narration = any(str(scene.get("narration") or "").strip() for scene in scenes)
         for i, scene in enumerate(scenes):
-            narration = scene.get("narration", "")
+            narration = str(scene.get("narration") or "").strip()
             duration = scene.get("duration_seconds", 10)
             scene_durations.append(float(duration))
             if narration:
@@ -351,6 +352,10 @@ def _merge_creative_video(
                 )
                 _fit_audio_to_duration(tts_path, aligned_tts_path, float(duration))
                 tts_files.append(str(aligned_tts_path.resolve()))
+            elif has_any_narration:
+                silence_path = tmpdir / f"tts_silence_{i:02d}.wav"
+                _create_silence_audio(silence_path, float(duration))
+                tts_files.append(str(silence_path.resolve()))
 
         if not tts_files:
             # No narration: just copy video
@@ -424,6 +429,30 @@ def _fit_audio_to_duration(input_path: Path, output_path: Path, duration_seconds
             str(input_path.resolve()),
             "-af",
             f"apad,atrim=0:{duration_seconds:.3f}",
+            "-ar",
+            "44100",
+            "-ac",
+            "2",
+            str(output_path.resolve()),
+        ],
+        check=True,
+        capture_output=True,
+        text=True,
+    )
+    return output_path
+
+
+def _create_silence_audio(output_path: Path, duration_seconds: float) -> Path:
+    subprocess.run(
+        [
+            "ffmpeg",
+            "-y",
+            "-f",
+            "lavfi",
+            "-i",
+            "anullsrc=channel_layout=stereo:sample_rate=44100",
+            "-t",
+            f"{duration_seconds:.3f}",
             "-ar",
             "44100",
             "-ac",
