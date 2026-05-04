@@ -61,6 +61,8 @@ def creative(
     out: Path = typer.Option(DEFAULT_OUT, "--out", "-o", help="Directory where run folders are written."),
     kimi_model: str | None = typer.Option(None, "--kimi-model", help="OpenRouter/Moonshot Kimi model name."),
     music: Path | None = typer.Option(None, "--music", help="Optional background music MP3 file."),
+    preview: bool = typer.Option(False, "--preview", help="Fast 12-15s preview render for iteration."),
+    skip_audio: bool = typer.Option(False, "--skip-audio", help="Skip TTS/music composition for fastest visual iteration."),
 ) -> None:
     """Generate a creative short video with Kimi 2.6 creative direction."""
     from repo_to_shorts.hermes_skill import run_creative_pipeline
@@ -72,6 +74,8 @@ def creative(
             out_dir=out,
             kimi_model=kimi_model,
             music_path=music,
+            preview=preview,
+            skip_audio=skip_audio,
         )
     except Exception as exc:  # noqa: BLE001
         raise typer.BadParameter(str(exc)) from exc

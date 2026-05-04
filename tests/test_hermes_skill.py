@@ -83,9 +83,14 @@ def test_run_creative_pipeline_success(
     assert metadata["kimi"]["model"] == "moonshotai/kimi-k2.6"
 
 
+@patch("repo_to_shorts.hermes_skill.burn_karaoke_captions")
+@patch("repo_to_shorts.hermes_skill.mix_audio")
+@patch("repo_to_shorts.hermes_skill.generate_ambient_music")
 @patch("repo_to_shorts.hermes_skill.generate_tts")
 @patch("repo_to_shorts.hermes_skill.subprocess.run")
-def test_merge_creative_video_with_narration(mock_run, mock_tts, tmp_path: Path):
+def test_merge_creative_video_with_narration(
+    mock_run, mock_tts, mock_generate_music, mock_mix_audio, mock_burn_captions, tmp_path: Path
+):
     video = tmp_path / "video.mp4"
     video.write_text("fake video")
     output = tmp_path / "out.mp4"
@@ -100,6 +105,9 @@ def test_merge_creative_video_with_narration(mock_run, mock_tts, tmp_path: Path)
     _merge_creative_video(video, scenes, output)
 
     assert mock_tts.call_count == 2
+    mock_generate_music.assert_called_once()
+    assert mock_mix_audio.call_args.kwargs["duration_seconds"] == 6
+    mock_burn_captions.assert_called_once()
     assert mock_run.call_count >= 2  # concat + merge
 
 
