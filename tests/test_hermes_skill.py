@@ -50,6 +50,31 @@ def test_build_repo_analysis_filters_secret_like_paths():
     assert "private_key.pem" not in str(analysis)
 
 
+def test_build_repo_analysis_keeps_common_repo_layout_evidence():
+    snapshot = FakeSnapshot()
+    snapshot.file_tree = [
+        "app/main.py",
+        "lib/core.py",
+        "cmd/server/main.go",
+        "go.mod",
+        "Dockerfile",
+        ".env",
+        "runs/demo.mp4",
+    ]
+
+    analysis = _build_repo_analysis(snapshot)
+
+    assert analysis["key_files"] == [
+        "app/main.py",
+        "lib/core.py",
+        "cmd/server/main.go",
+        "go.mod",
+        "Dockerfile",
+    ]
+    assert ".env" not in analysis["key_files"]
+    assert "runs/demo.mp4" not in analysis["key_files"]
+
+
 @patch("repo_to_shorts.hermes_skill.ingest_target")
 @patch("repo_to_shorts.hermes_skill.direct")
 @patch("repo_to_shorts.hermes_skill.generate_manim_script")

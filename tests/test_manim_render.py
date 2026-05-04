@@ -71,6 +71,21 @@ def test_generate_manim_script_filters_secret_key_files(tmp_path: Path):
     assert data["key_files"] == ["src/app.py", "docs/README.md"]
 
 
+def test_generate_manim_script_keeps_common_repo_layout_key_files(tmp_path: Path):
+    scene = {"scenes": [], "fps": 30}
+    repo_analysis = {
+        "name": "test-repo",
+        "description": "Test",
+        "components": [],
+        "key_files": ["app/main.py", "frontend/App.tsx", "Cargo.toml", ".env", "id_rsa"],
+    }
+
+    script_path = generate_manim_script(scene, repo_analysis, tmp_path / "out")
+
+    data = json.loads(script_path.read_text(encoding="utf-8"))
+    assert data["key_files"] == ["app/main.py", "frontend/App.tsx", "Cargo.toml"]
+
+
 def test_caption_chunks_create_karaoke_phrases():
     chunks = _caption_chunks("This repo turns source code into a launch film with proof", words_per_chunk=3)
 

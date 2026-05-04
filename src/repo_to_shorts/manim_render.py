@@ -12,8 +12,21 @@ from PIL import Image, ImageDraw, ImageFilter, ImageFont
 DEFAULT_WIDTH = 1080
 DEFAULT_HEIGHT = 1920
 DEFAULT_FPS = 30
-SAFE_FILE_PREFIXES = ("src/", "tests/", "docs/")
-SAFE_FILE_NAMES = {"README.md", "pyproject.toml", "package.json"}
+SAFE_FILE_PREFIXES = (
+    "src/",
+    "tests/",
+    "test/",
+    "docs/",
+    "app/",
+    "lib/",
+    "packages/",
+    "cmd/",
+    "internal/",
+    "web/",
+    "frontend/",
+    "backend/",
+)
+SAFE_FILE_NAMES = {"README.md", "pyproject.toml", "package.json", "Cargo.toml", "go.mod", "Dockerfile", "Makefile"}
 SECRET_FILE_MARKERS = (".env", "secret", "token", "private", "id_rsa", ".pem", ".key")
 
 STYLES: dict[str, dict[str, str]] = {
