@@ -146,6 +146,87 @@ def test_generate_tts_allows_explicit_say_fallback(monkeypatch, tmp_path: Path):
     assert [cmd[0] for cmd in commands] == ["edge-tts", "say", "ffmpeg"]
 
 
+def test_generate_tts_uses_xai_provider(monkeypatch, tmp_path: Path):
+    requests = []
+    commands = []
+
+    class FakeResponse:
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *args):
+            return None
+
+        def read(self):
+            return b"fake mp3"
+
+    def fake_urlopen(request, timeout=60):
+        requests.append(request)
+        return FakeResponse()
+
+    def fake_run(command, **kwargs):
+        commands.append(command)
+        out = Path(command[-1])
+        out.write_bytes(b"fake wav")
+        return subprocess.CompletedProcess(command, 0, "", "")
+
+    monkeypatch.setenv("XAI_API_KEY", "test-xai")
+    monkeypatch.setattr("repo_to_shorts.compositor.urllib.request.urlopen", fake_urlopen)
+    monkeypatch.setattr("repo_to_shorts.compositor.subprocess.run", fake_run)
+
+    result = generate_tts("Ship this repo.", tmp_path / "tts.wav", provider="xai", voice="orpheus")
+
+    assert result == (tmp_path / "tts.wav").resolve()
+    assert requests
+    assert requests[0].full_url == "https://api.x.ai/v1/tts"
+    assert requests[0].headers["Authorization"] == "Bearer test-xai"
+    assert b"Ship this repo." in requests[0].data
+    assert b"orpheus" in requests[0].data
+    assert commands[0][0] == "ffmpeg"
+
+
+def test_generate_tts_falls_back_from_xai_to_openai(monkeypatch, tmp_path: Path):
+    urls = []
+
+    class FakeResponse:
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *args):
+            return None
+
+        def read(self):
+            return b"fake mp3"
+
+    def fake_urlopen(request, timeout=60):
+        urls.append(request.full_url)
+        if "x.ai" in request.full_url:
+            raise OSError("xai down")
+        return FakeResponse()
+
+    monkeypatch.setenv("XAI_API_KEY", "test-xai")
+    monkeypatch.setenv("OPENAI_API_KEY", "test-openai")
+    monkeypatch.setattr("repo_to_shorts.compositor.urllib.request.urlopen", fake_urlopen)
+    monkeypatch.setattr(
+        "repo_to_shorts.compositor.subprocess.run",
+        lambda command, **kwargs: (Path(command[-1]).write_bytes(b"fake wav"), subprocess.CompletedProcess(command, 0, "", ""))[1],
+    )
+
+    result = generate_tts("Fallback voice.", tmp_path / "tts.wav", provider="xai", fallback_provider="openai")
+
+    assert result == (tmp_path / "tts.wav").resolve()
+    assert urls == ["https://api.x.ai/v1/tts", "https://api.openai.com/v1/audio/speech"]
+
+
+def test_generate_tts_none_provider_raises_clear_error(tmp_path: Path):
+    try:
+        generate_tts("No voice.", tmp_path / "tts.wav", provider="none")
+    except RuntimeError as exc:
+        assert "TTS provider is none" in str(exc)
+    else:
+        raise AssertionError("provider=none should not generate audio")
+
+
 def test_mix_audio_with_music(monkeypatch, tmp_path: Path):
     commands = []
 
