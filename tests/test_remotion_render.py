@@ -43,6 +43,11 @@ def test_build_remotion_input_contains_repo_proof_scenes_and_artifacts():
             "kimi_model": "moonshotai/kimi-k2.6",
             "render_validation": "pass",
         },
+        creative_direction={
+            "visual_world": "retro console",
+            "tone": "tight editorial",
+            "motion_principles": ["scan", "beat"],
+        },
         artifacts=["demo.mp4", "metadata.json", "captions.srt", "submission_pack.md"],
     )
 
@@ -55,7 +60,12 @@ def test_build_remotion_input_contains_repo_proof_scenes_and_artifacts():
         "duration_seconds": 45,
     }
     assert data["proof"]["kimi_mode"] == "live-api"
+    assert data["creative_direction"]["visual_world"] == "retro console"
+    assert data["creative_direction"]["tone"] == "tight editorial"
+    assert data["creative_direction"]["motion_principles"] == ["scan", "beat"]
     assert data["scenes"][0]["type"] == "ColdOpen"
+    assert data["scenes"][0]["layout"] == "cover_burst"
+    assert data["scenes"][0]["visual_role"] == "cover"
     assert data["artifacts"] == [
         "demo.mp4",
         "metadata.json",
@@ -94,9 +104,12 @@ def test_build_remotion_input_limits_key_files_and_uses_default_artifacts():
         key_files=[f"file-{index}.py" for index in range(12)],
         scenes=[],
         proof={},
+        creative_direction={"tone": "minimal", "visual_world": "terminal"},
     )
 
     assert data["repo"]["key_files"] == [f"file-{index}.py" for index in range(8)]
+    assert data["creative_direction"]["visual_world"] == "terminal"
+    assert data["creative_direction"]["tone"] == "minimal"
     assert data["artifacts"] == DEFAULT_ARTIFACTS
 
 
@@ -138,10 +151,17 @@ def test_normalize_scene_preserves_values_and_limits_lists():
     assert scene == {
         "type": "LiveProof",
         "duration_seconds": 7.5,
+        "visual_role": "proof",
+        "layout": "proof_sheet",
+        "shot": "",
+        "shot_hint": "",
         "headline": "Proof is inspectable.",
         "narration": "Metadata records live model proof.",
         "evidence": ["a", "b", "c", "d"],
         "caption_emphasis": ["one", "two", "three", "four", "five"],
+        "visual_tool": "manim",
+        "transition": "cut",
+        "motion_focus": "",
     }
 
 

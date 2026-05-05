@@ -22,6 +22,8 @@ class CreativeBrief:
     distribution_channel: str = "x_short"
     reference_pack: list = field(default_factory=list)
     visual_world: str = "cinematic engineering console"
+    tone: str = "retro VHS broadcast"
+    visual_style: str = ""
     motion_principles: list[str] = field(default_factory=list)
     shot_list: list[str] = field(default_factory=list)
     continuity_rules: list[str] = field(default_factory=list)
@@ -334,6 +336,9 @@ def _parse_brief(content: str) -> CreativeBrief:
     data = _loads_brief_json(text)
     raw_scenes = data.get("storyboard") or data.get("scenes", [])
     scenes = [_normalize_scene(scene) for scene in raw_scenes]
+    creative_direction = data.get("creative_direction", {})
+    if not isinstance(creative_direction, dict):
+        creative_direction = {}
     return CreativeBrief(
         style=data.get("style", "dark-terminal"),
         title=data.get("title", "Untitled"),
@@ -348,11 +353,13 @@ def _parse_brief(content: str) -> CreativeBrief:
         distribution_channel=data.get("distribution_channel", "x_short"),
         reference_pack=data.get("reference_pack", []),
         visual_world=data.get("visual_world", "cinematic engineering console"),
-        motion_principles=data.get("motion_principles", []),
-        shot_list=data.get("shot_list", []),
-        continuity_rules=data.get("continuity_rules", []),
-        negative_prompts=data.get("negative_prompts", []),
-        quality_bar=data.get("quality_bar", {}),
+        tone=data.get("tone", creative_direction.get("tone", "")),
+        visual_style=data.get("visual_style", creative_direction.get("visual_style", "")),
+        motion_principles=data.get("motion_principles", creative_direction.get("motion_principles", [])),
+        shot_list=data.get("shot_list", creative_direction.get("shot_list", [])),
+        continuity_rules=data.get("continuity_rules", creative_direction.get("continuity_rules", [])),
+        negative_prompts=data.get("negative_prompts", creative_direction.get("negative_prompts", [])),
+        quality_bar=data.get("quality_bar", creative_direction.get("quality_bar", {})),
     )
 
 

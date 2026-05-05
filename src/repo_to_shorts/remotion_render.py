@@ -27,11 +27,13 @@ def build_remotion_input(
     scenes: list[dict[str, Any]],
     proof: dict[str, Any],
     artifacts: list[str] | None = None,
+    creative_direction: dict[str, Any] | None = None,
     width: int = 1080,
     height: int = 1920,
     fps: int = 30,
     duration_seconds: int = 45,
 ) -> dict[str, Any]:
+    creative = dict(creative_direction or {})
     return {
         "schema_version": 1,
         "repo": {
@@ -46,6 +48,16 @@ def build_remotion_input(
             "duration_seconds": duration_seconds,
         },
         "proof": proof,
+        "creative_direction": {
+            "visual_world": str(creative.get("visual_world") or ""),
+            "tone": str(creative.get("tone") or ""),
+            "visual_style": str(creative.get("visual_style") or ""),
+            "quality_bar": creative.get("quality_bar", {}) if isinstance(creative.get("quality_bar"), dict) else {},
+            "motion_principles": _string_list(creative.get("motion_principles"), limit=8),
+            "shot_list": _string_list(creative.get("shot_list"), limit=12),
+            "continuity_rules": _string_list(creative.get("continuity_rules"), limit=8),
+            "negative_prompts": _string_list(creative.get("negative_prompts"), limit=8),
+        },
         "scenes": [_normalize_scene(scene, index) for index, scene in enumerate(scenes)],
         "artifacts": list(DEFAULT_ARTIFACTS) if artifacts is None else list(artifacts),
     }
@@ -82,6 +94,7 @@ def render_remotion_video(
     description: str,
     key_files: list[str],
     proof: dict[str, Any],
+    creative_direction: dict[str, Any] | None = None,
     config: RenderConfig | None = None,
     project_root: Path | None = None,
 ) -> RenderResult:
@@ -104,6 +117,7 @@ def render_remotion_video(
             key_files=key_files,
             scenes=scenes,
             proof=proof,
+            creative_direction=creative_direction,
             width=cfg.width,
             height=cfg.height,
             fps=cfg.fps,
@@ -157,9 +171,25 @@ def render_remotion_video(
 
 def _normalize_scene(scene: dict[str, Any], index: int) -> dict[str, Any]:
     narration = str(scene.get("narration") or "")
+    scene_type = str(scene.get("type") or _default_scene_type(index))
+    visual_tool = str(scene.get("visual_tool") or "")
     return {
-        "type": str(scene.get("type") or _default_scene_type(index)),
+        "type": scene_type,
         "duration_seconds": float(scene.get("duration_seconds", 6)),
+        "visual_role": str(
+            scene.get("visual_role")
+            or scene.get("layout")
+            or visual_tool
+            or _infer_visual_role(scene_type)
+        ),
+        "layout": str(
+            scene.get("layout")
+            or _infer_layout(scene_type, index)
+            or scene.get("visual_tool")
+            or ""
+        ),
+        "shot": str(scene.get("shot") or ""),
+        "shot_hint": str(scene.get("shot_hint") or ""),
         "headline": str(
             scene.get("headline")
             or scene.get("hook")
@@ -168,6 +198,9 @@ def _normalize_scene(scene: dict[str, Any], index: int) -> dict[str, Any]:
         "narration": narration,
         "evidence": _string_list(scene.get("evidence"), limit=4),
         "caption_emphasis": _string_list(scene.get("caption_emphasis"), limit=5),
+        "visual_tool": visual_tool or _visual_tool_from_type(scene_type),
+        "transition": str(scene.get("transition") or "cut"),
+        "motion_focus": str(scene.get("motion_focus") or ""),
     }
 
 
@@ -206,6 +239,48 @@ def _trim_process_output(output: Any, *, limit: int = 800) -> str:
 
 def _default_scene_type(index: int) -> str:
     return DEFAULT_SCENE_TYPES[min(index, len(DEFAULT_SCENE_TYPES) - 1)]
+
+
+def _infer_layout(scene_type: str, index: int) -> str:
+    mapped = {
+        "coldopen": "cover_burst",
+        "repoevidence": "repo_card",
+        "painpoint": "problem_block",
+        "pipelinemap": "pipeline_flow",
+        "artifactstack": "artifact_wall",
+        "liveproof": "proof_sheet",
+        "demopreview": "preview_frame",
+        "ctaendcard": "cta_band",
+    }
+    return mapped.get(scene_type.lower(), f"layout_{index % 4}")
+
+
+def _infer_visual_role(scene_type: str) -> str:
+    mapped = {
+        "coldopen": "cover",
+        "repoevidence": "evidence",
+        "painpoint": "tension",
+        "pipelinemap": "flow",
+        "artifactstack": "stack",
+        "liveproof": "proof",
+        "demopreview": "demo",
+        "ctaendcard": "cta",
+    }
+    return mapped.get(scene_type.lower(), "generic")
+
+
+def _visual_tool_from_type(scene_type: str) -> str:
+    mapped = {
+        "coldopen": "pretext",
+        "repoevidence": "svg",
+        "painpoint": "ascii",
+        "pipelinemap": "svg",
+        "artifactstack": "ascii",
+        "liveproof": "manim",
+        "demopreview": "manim",
+        "ctaendcard": "pretext",
+    }
+    return mapped.get(scene_type.lower(), "pretext")
 
 
 def _headline_from_narration(narration: str) -> str:

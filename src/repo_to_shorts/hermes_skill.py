@@ -160,6 +160,16 @@ def run_creative_pipeline(
                 description=repo_analysis["description"],
                 key_files=repo_analysis["key_files"],
                 proof=_build_remotion_proof(kimi_metadata),
+                creative_direction={
+                    "visual_world": brief_manifest.get("visual_world"),
+                    "tone": brief_manifest.get("tone", ""),
+                    "visual_style": brief_manifest.get("visual_style", ""),
+                    "quality_bar": brief_manifest.get("quality_bar", {}),
+                    "motion_principles": brief_manifest.get("motion_principles", []),
+                    "shot_list": brief_manifest.get("shot_list", []),
+                    "continuity_rules": brief_manifest.get("continuity_rules", []),
+                    "negative_prompts": brief_manifest.get("negative_prompts", []),
+                },
                 config=RenderConfig(output_name=raw_video.name),
             )
 
@@ -231,6 +241,14 @@ def run_creative_pipeline(
                 "scenes": brief.scenes,
                 "music_mood": brief.music_mood,
                 "total_duration": brief.total_duration,
+                "visual_world": brief_manifest.get("visual_world", ""),
+                "tone": brief_manifest.get("tone", ""),
+                "visual_style": brief_manifest.get("visual_style", ""),
+                "motion_principles": brief_manifest.get("motion_principles", []),
+                "shot_list": brief_manifest.get("shot_list", []),
+                "continuity_rules": brief_manifest.get("continuity_rules", []),
+                "negative_prompts": brief_manifest.get("negative_prompts", []),
+                "quality_bar": brief_manifest.get("quality_bar", {}),
             },
             "kimi": kimi_metadata,
             "tts": {
@@ -278,7 +296,11 @@ def run_creative_pipeline(
         )
         for p in production_paths:
             metadata["artifacts"].append("production/" + p.name)
-        artifact_qa_report = score_rendered_artifact(metadata=metadata, evidence_manifest=evidence_manifest) if final else qa_report
+        artifact_qa_report = score_rendered_artifact(
+            metadata=metadata,
+            evidence_manifest=evidence_manifest,
+            run_dir=run_dir,
+        ) if final else qa_report
         combined_qa_report = _merge_qa_reports(qa_report, artifact_qa_report)
         if final and combined_qa_report is not qa_report:
             combined_q_path = run_dir / "production" / "qa_report.json"
@@ -671,6 +693,8 @@ def _brief_to_manifest(brief) -> dict:
         "distribution_channel": _safe("distribution_channel", "x_short"),
         "reference_pack": _safe("reference_pack", []),
         "visual_world": _safe("visual_world", ""),
+        "tone": _safe("tone", ""),
+        "visual_style": _safe("visual_style", ""),
         "motion_principles": _safe("motion_principles", []),
         "shot_list": _safe("shot_list", []),
         "continuity_rules": _safe("continuity_rules", []),

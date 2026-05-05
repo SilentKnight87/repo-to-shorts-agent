@@ -18,8 +18,9 @@ import {
   spacing,
   type,
 } from './styles';
+import {KNOWN_LAYOUTS, inferSceneLayout, inferSceneType, KNOWN_SCENE_TYPES, type SceneLayout} from './sceneTypes';
 
-type SceneType =
+type SceneTypeName =
   | 'ColdOpen'
   | 'RepoEvidence'
   | 'PainPoint'
@@ -30,15 +31,32 @@ type SceneType =
   | 'CTAEndCard';
 
 export type RepoShortsScene = {
-  type?: SceneType | string;
+  type?: SceneTypeName | string;
   duration_seconds?: number;
   headline?: string;
   narration?: string;
   evidence?: string[];
   caption_emphasis?: string[];
+  layout?: string;
+  visual_role?: string;
+  shot?: string;
+  shot_hint?: string;
+  visual_tool?: string;
+  transition?: string;
+  motion_focus?: string;
 };
 
 export type RepoShortsManifest = {
+  creative_direction?: {
+    visual_world?: string;
+    tone?: string;
+    visual_style?: string;
+    quality_bar?: Record<string, unknown>;
+    motion_principles?: string[];
+    shot_list?: string[];
+    continuity_rules?: string[];
+    negative_prompts?: string[];
+  };
   repo?: {
     name?: string;
     description?: string;
@@ -68,13 +86,47 @@ type NormalizedManifest = {
     duration_seconds: number;
   };
   proof: Record<string, unknown>;
-  scenes: Required<RepoShortsScene>[];
+  scenes: NormalizedScene[];
   artifacts: string[];
+  creative_direction: {
+    visual_world: string;
+    tone: string;
+    visual_style: string;
+    quality_bar: Record<string, unknown>;
+    motion_principles: string[];
+    shot_list: string[];
+    continuity_rules: string[];
+    negative_prompts: string[];
+  };
 };
 
-const DEFAULT_SCENES: Required<RepoShortsScene>[] = [
+type SceneType = SceneTypeName | 'Unknown';
+type NormalizedScene = {
+  type: SceneType;
+  duration_seconds: number;
+  headline: string;
+  narration: string;
+  evidence: string[];
+  caption_emphasis: string[];
+  layout: string;
+  visual_role: string;
+  shot: string;
+  shot_hint: string;
+  visual_tool: string;
+  transition: string;
+  motion_focus: string;
+};
+
+const DEFAULT_SCENES: NormalizedScene[] = [
   {
     type: 'ColdOpen',
+    layout: 'cover_burst',
+    visual_role: 'cover',
+    shot: '',
+    shot_hint: '',
+    visual_tool: 'pretext',
+    transition: 'cut',
+    motion_focus: '',
     duration_seconds: 3,
     headline: "This repo made the video you're watching.",
     narration: "This repo made the video you're watching.",
@@ -83,6 +135,13 @@ const DEFAULT_SCENES: Required<RepoShortsScene>[] = [
   },
   {
     type: 'RepoEvidence',
+    layout: 'repo_card',
+    visual_role: 'evidence',
+    shot: '',
+    shot_hint: '',
+    visual_tool: 'svg',
+    transition: 'cut',
+    motion_focus: '',
     duration_seconds: 6,
     headline: 'Source code becomes a launch package.',
     narration: 'Repo-to-Shorts inspects the local project and turns it into a short-video package.',
@@ -91,6 +150,13 @@ const DEFAULT_SCENES: Required<RepoShortsScene>[] = [
   },
   {
     type: 'PipelineMap',
+    layout: 'pipeline_flow',
+    visual_role: 'flow',
+    shot: '',
+    shot_hint: '',
+    visual_tool: 'svg',
+    transition: 'cut',
+    motion_focus: '',
     duration_seconds: 7,
     headline: 'Ingest. Critique. Render. Submit.',
     narration: 'The pipeline builds the brief, storyboard, captions, copy, browser demo, and optional MP4.',
@@ -99,6 +165,13 @@ const DEFAULT_SCENES: Required<RepoShortsScene>[] = [
   },
   {
     type: 'LiveProof',
+    layout: 'proof_sheet',
+    visual_role: 'proof',
+    shot: '',
+    shot_hint: '',
+    visual_tool: 'manim',
+    transition: 'cut',
+    motion_focus: '',
     duration_seconds: 6,
     headline: 'Kimi proof is visible in metadata.',
     narration: 'The generated run records live model mode, provider, and model without faking proof.',
@@ -107,6 +180,13 @@ const DEFAULT_SCENES: Required<RepoShortsScene>[] = [
   },
   {
     type: 'CTAEndCard',
+    layout: 'cta_band',
+    visual_role: 'cta',
+    shot: '',
+    shot_hint: '',
+    visual_tool: 'pretext',
+    transition: 'cut',
+    motion_focus: '',
     duration_seconds: 5,
     headline: 'Run it locally. Record the package. Ship the short.',
     narration: 'One command creates the assets for X and Discord submission.',
@@ -132,27 +212,101 @@ export const DEFAULT_MANIFEST: NormalizedManifest = {
     kimi_provider: 'local',
     kimi_model: 'fallback',
   },
+  creative_direction: {
+    visual_world: 'Retro VHS broadcast deck',
+    tone: '',
+    visual_style: '',
+    quality_bar: {},
+    motion_principles: [],
+    shot_list: [],
+    continuity_rules: [],
+    negative_prompts: [],
+  },
   scenes: DEFAULT_SCENES,
   artifacts: ['demo.mp4', 'metadata.json', 'captions.srt', 'submission_pack.md'],
 };
 
-const KNOWN_SCENE_TYPES = new Set<string>([
-  'ColdOpen',
-  'RepoEvidence',
-  'PainPoint',
-  'PipelineMap',
-  'ArtifactStack',
-  'LiveProof',
-  'DemoPreview',
-  'CTAEndCard',
-]);
+const KNOWN_SCENE_TYPES_SET = new Set<string>(KNOWN_SCENE_TYPES);
+const LAYOUT_EFFECT: Record<
+  SceneLayout | 'default',
+  {background: string; sideBand: number; accent: string; bar: string}
+> = {
+  cover_burst: {
+    background: `linear-gradient(160deg, ${colors.carbon} 0%, #0c1736 45%, #0f1019 100%)`,
+    sideBand: 0,
+    accent: colors.cyan,
+    bar: colors.green,
+  },
+  repo_card: {
+    background: `linear-gradient(160deg, #0f1824 0%, #111a24 52%, ${colors.ink} 100%)`,
+    sideBand: 52,
+    accent: colors.amber,
+    bar: colors.green,
+  },
+  problem_block: {
+    background: `linear-gradient(160deg, #221111 0%, #1a0f12 54%, ${colors.ink} 100%)`,
+    sideBand: 52,
+    accent: colors.red,
+    bar: colors.ghostMagenta,
+  },
+  pipeline_flow: {
+    background: `linear-gradient(160deg, #0f1927 0%, #121620 52%, ${colors.ink} 100%)`,
+    sideBand: 52,
+    accent: colors.green,
+    bar: colors.cyan,
+  },
+  artifact_wall: {
+    background: `linear-gradient(160deg, ${colors.ink} 0%, ${colors.carbon} 64%, ${colors.panelSoft} 100%)`,
+    sideBand: 52,
+    accent: colors.amber,
+    bar: colors.paperDim,
+  },
+  proof_sheet: {
+    background: `linear-gradient(160deg, #13140e 0%, #1a2715 58%, ${colors.ink} 100%)`,
+    sideBand: 52,
+    accent: colors.ghost,
+    bar: colors.green,
+  },
+  preview_frame: {
+    background: `linear-gradient(160deg, #0f1014 0%, #101623 58%, #0c1b2f 100%)`,
+    sideBand: 52,
+    accent: colors.cyan,
+    bar: colors.ghostCyan,
+  },
+  cta_band: {
+    background: `linear-gradient(160deg, #111111 0%, #1a1a1a 60%, #2a1d2d 100%)`,
+    sideBand: 0,
+    accent: colors.ghostMagenta,
+    bar: colors.green,
+  },
+  default: {
+    background: `linear-gradient(160deg, ${colors.carbon} 0%, #111820 52%, #0b0d15 100%)`,
+    sideBand: 52,
+    accent: colors.green,
+    bar: colors.paperDim,
+  },
+};
 
 export const normalizeManifest = (input: RepoShortsManifest = {}): NormalizedManifest => {
   const video = input.video ?? {};
   const repo = input.repo ?? {};
+  const creative = input.creative_direction ?? {};
   const scenes = input.scenes && input.scenes.length > 0 ? input.scenes : DEFAULT_SCENES;
   const normalizedScenes = scenes.map((scene, index) => ({
-    type: String(scene.type || DEFAULT_SCENES[index % DEFAULT_SCENES.length].type),
+    type: inferSceneType(scene.type || DEFAULT_SCENES[index % DEFAULT_SCENES.length].type),
+    layout: String(
+      scene.layout
+        || inferSceneLayout(
+          inferSceneType(scene.type || DEFAULT_SCENES[index % DEFAULT_SCENES.length].type),
+          index,
+        ),
+    ),
+    visual_role: String(scene.visual_role || ''),
+    shot: String(scene.shot || ''),
+    shot_hint: String(scene.shot_hint || ''),
+    visual_tool: String(scene.visual_tool || ''),
+    transition: String(scene.transition || 'cut'),
+    motion_focus: String(scene.motion_focus || ''),
     duration_seconds: Math.max(0.5, Number(scene.duration_seconds || 6)),
     headline: String(scene.headline || scene.narration || 'Repo to Shorts'),
     narration: String(scene.narration || scene.headline || ''),
@@ -182,6 +336,16 @@ export const normalizeManifest = (input: RepoShortsManifest = {}): NormalizedMan
     proof: input.proof && typeof input.proof === 'object' ? input.proof : {},
     scenes: normalizedScenes,
     artifacts: normalizeStringList(input.artifacts, 12),
+    creative_direction: {
+      visual_world: String(creative.visual_world || 'Retro VHS broadcast deck'),
+      tone: String(creative.tone || ''),
+      visual_style: String(creative.visual_style || ''),
+      quality_bar: creative.quality_bar && typeof creative.quality_bar === 'object' ? creative.quality_bar : {},
+      motion_principles: normalizeStringList(creative.motion_principles, 8),
+      shot_list: normalizeStringList(creative.shot_list, 12),
+      continuity_rules: normalizeStringList(creative.continuity_rules, 8),
+      negative_prompts: normalizeStringList(creative.negative_prompts, 8),
+    },
   };
 };
 
@@ -198,7 +362,7 @@ export const getDurationInFrames = (manifest: RepoShortsManifest): number => {
 };
 
 export const getSceneDurationInFrames = (
-  scene: Pick<Required<RepoShortsScene>, 'duration_seconds'>,
+  scene: Pick<NormalizedScene, 'duration_seconds'>,
   fps: number,
 ): number => {
   return Math.max(1, Math.round(scene.duration_seconds * fps));
@@ -237,12 +401,12 @@ export const RepoShortsVideo: React.FC<RepoShortsManifest> = (props) => {
 
 const SceneFrame: React.FC<{
   manifest: NormalizedManifest;
-  scene: Required<RepoShortsScene>;
+  scene: NormalizedScene;
   sceneIndex: number;
   sceneCount: number;
   durationInFrames: number;
 }> = ({manifest, scene, sceneIndex, sceneCount, durationInFrames}) => {
-  const isKnownSceneType = KNOWN_SCENE_TYPES.has(scene.type);
+  const isKnownSceneType = KNOWN_SCENE_TYPES_SET.has(String(scene.type));
   const typeName = scene.type;
   const frame = useCurrentFrame();
   const sceneProgress = Math.min(1, Math.max(0, frame / Math.max(1, durationInFrames - 1)));
@@ -263,12 +427,12 @@ const SceneFrame: React.FC<{
   return (
     <AbsoluteFill style={{opacity}}>
       <Backplate manifest={manifest} scene={scene} frame={frame} sceneProgress={sceneProgress} />
-      <div
-        style={{
-          ...safeArea,
-          transform: `translate(${stageOffsetX}px, ${y}px)`,
-        }}
-      >
+        <div
+          style={{
+            ...safeArea,
+            transform: `translate(${stageOffsetX}px, ${y}px)`,
+          }}
+        >
         <SceneChrome
           scene={scene}
           manifest={manifest}
@@ -291,7 +455,7 @@ const SceneFrame: React.FC<{
 };
 
 const SceneChrome: React.FC<{
-  scene: Required<RepoShortsScene>;
+  scene: NormalizedScene;
   manifest: NormalizedManifest;
   sceneIndex: number;
   sceneCount: number;
@@ -441,7 +605,7 @@ const ColdOpen: React.FC<SceneProps> = ({manifest, scene}) => {
 
 type SceneProps = {
   manifest: NormalizedManifest;
-  scene: Required<RepoShortsScene>;
+  scene: NormalizedScene;
 };
 
 const RepoEvidence: React.FC<SceneProps> = ({manifest, scene}) => (
@@ -467,7 +631,7 @@ const PainPoint: React.FC<SceneProps> = ({scene}) => {
   );
 };
 
-const PipelineMap: React.FC<{scene: Required<RepoShortsScene>}> = ({scene}) => {
+const PipelineMap: React.FC<{scene: NormalizedScene}> = ({scene}) => {
   const frame = useCurrentFrame();
   const progress = Math.min(1, frame / 120);
   const steps = ['ingest', 'Kimi critic', 'storyboard', 'render', 'submission'];
@@ -977,7 +1141,7 @@ const PhonePreview: React.FC<{manifest: NormalizedManifest}> = ({manifest}) => (
 
 const CaptionLine: React.FC<{
   manifest: NormalizedManifest;
-  scene: Required<RepoShortsScene>;
+  scene: NormalizedScene;
   frame: number;
   sceneProgress: number;
 }> = ({manifest, scene, frame, sceneProgress}) => {
@@ -1042,29 +1206,19 @@ const CaptionLine: React.FC<{
 
 const Backplate: React.FC<{
   manifest: NormalizedManifest;
-  scene: Required<RepoShortsScene>;
+  scene: NormalizedScene;
   frame: number;
   sceneProgress: number;
 }> = ({manifest, scene, frame, sceneProgress}) => {
   const sweep = interpolate(frame % 180, [0, 180], [-260, 1220]);
-  const hue =
-    scene.type === 'ColdOpen'
-      ? colors.cyan
-      : scene.type === 'PipelineMap'
-        ? colors.green
-        : scene.type === 'LiveProof'
-          ? colors.amber
-          : colors.ghost;
+  const layout = String(scene.layout || inferSceneLayout(scene.type, 0));
+  const theme = LAYOUT_EFFECT[KNOWN_LAYOUTS.includes(layout as SceneLayout)
+    ? (layout as SceneLayout)
+    : 'default'];
+  const hue = theme.accent;
   const bgShift = interpolate(sceneProgress, [0, 1], [-20, 20], {extrapolateRight: 'clamp'});
-  const sceneGradient =
-    scene.type === 'ColdOpen'
-      ? `linear-gradient(160deg, ${colors.carbon} 0%, #0c1736 45%, #0f1019 100%)`
-      : scene.type === 'PipelineMap'
-        ? `linear-gradient(160deg, #0f1927 0%, #121620 52%, ${colors.ink} 100%)`
-        : scene.type === 'LiveProof'
-          ? `linear-gradient(160deg, #13140e 0%, #1a2715 58%, ${colors.ink} 100%)`
-          : `linear-gradient(135deg, ${colors.carbon} 0%, #111820 46%, #12100a 100%)`;
-  const sideBand = scene.type === 'CTAEndCard' ? 0 : 52;
+  const sceneGradient = theme.background;
+  const sideBand = theme.sideBand;
   return (
     <AbsoluteFill style={{transform: `translateX(${bgShift}px)`}}>
       <div

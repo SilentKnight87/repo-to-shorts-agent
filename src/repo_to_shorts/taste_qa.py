@@ -3,6 +3,8 @@ from __future__ import annotations
 from collections import Counter
 from typing import Any
 
+from repo_to_shorts.visual_qa import score_rendered_visual_artifacts
+
 GENERIC_WORDS = {"seamless", "robust", "leverage", "optimize", "game-changing", "supercharge", "unleash"}
 PROOF_TERMS = {"metadata", "demo.mp4", "file", "command", "artifact", "src/", "tests/"}
 
@@ -87,7 +89,12 @@ def score_creative_plan(
     }
 
 
-def score_rendered_artifact(*, metadata: dict[str, Any], evidence_manifest: dict[str, Any] | None = None) -> dict[str, Any]:
+def score_rendered_artifact(
+    *,
+    metadata: dict[str, Any],
+    evidence_manifest: dict[str, Any] | None = None,
+    run_dir=None,
+) -> dict[str, Any]:
     brief = metadata.get("creative_brief") or {}
     brief_report = score_creative_plan(
         brief,
@@ -98,6 +105,11 @@ def score_rendered_artifact(*, metadata: dict[str, Any], evidence_manifest: dict
     factual = list(brief_report.get("factual_issues", []))
     taste = list(brief_report.get("taste_issues", []))
     visual = list(brief_report.get("visual_issues", []))
+
+    visual_report = score_rendered_visual_artifacts(metadata, run_dir=run_dir)
+    blocking.extend(visual_report.get("blocking_issues", []))
+    factual.extend(visual_report.get("factual_issues", []))
+    visual.extend(visual_report.get("visual_issues", []))
 
     validation = ((metadata.get("render") or {}).get("validation") or {})
     if not validation.get("ok"):
