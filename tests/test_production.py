@@ -18,6 +18,7 @@ def test_write_production_manifests_creates_expected_files(tmp_path: Path):
         "asset_manifest": {"assets": []},
         "audio_plan": {"mode": "voiceover_with_ducked_music"},
         "qa_report": {"overall": "pass"},
+        "revision_history": {"attempts": []},
     }
 
     written = write_production_manifests(run_dir, **data)
@@ -30,6 +31,7 @@ def test_write_production_manifests_creates_expected_files(tmp_path: Path):
         "evidence_manifest.json",
         "qa_report.json",
         "reference_pack.json",
+        "revision_history.json",
         "scene_plan.json",
     ]
     assert json.loads((run_dir / "production" / "design_profile.json").read_text())["name"] == "Console"
@@ -41,6 +43,6 @@ def test_write_production_manifests_creates_zeros_for_missing_keys(tmp_path: Pat
 
     written = write_production_manifests(run_dir, design_profile={"name": "Minimal"})
 
-    assert len(written) == 8
+    assert len(written) == 9
     assert json.loads((run_dir / "production" / "design_profile.json").read_text())["name"] == "Minimal"
     assert json.loads((run_dir / "production" / "qa_report.json").read_text()) == {}

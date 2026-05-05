@@ -19,14 +19,14 @@ class FakeSnapshot:
 def _final_brief(**overrides):
     values = {
         "style": "dark-terminal",
-        "title": "Final Title",
-        "hook": "Final hook",
+        "title": "Repo-to-Shorts Turns Code Into Launch Video",
+        "hook": "A repo becomes a validated short-video package ready to ship.",
         "scenes": [
-            {"type": "ColdOpen", "duration_seconds": 10, "narration": "Scene one.", "headline": "REPO BECOMES REEL", "evidence": ["repo_name"]},
-            {"type": "PipelineMap", "duration_seconds": 10, "narration": "Scene two.", "headline": "KIMI READS THE REPO", "evidence": ["src/pipeline.py"]},
+            {"type": "ColdOpen", "duration_seconds": 10, "narration": "Scene one.", "headline": "REPO BECOMES REEL", "evidence": ["README.md"]},
+            {"type": "PipelineMap", "duration_seconds": 10, "narration": "Scene two.", "headline": "KIMI READS THE REPO", "evidence": ["src/app.py"]},
             {"type": "LiveProof", "duration_seconds": 10, "narration": "Scene three.", "headline": "PROOF IN METADATA", "evidence": ["metadata.json"]},
             {"type": "ArtifactStack", "duration_seconds": 10, "narration": "Scene four.", "headline": "SHORT PACKAGE BUILT", "evidence": ["demo.mp4"]},
-            {"type": "CTAEndCard", "duration_seconds": 10, "narration": "Scene five.", "headline": "SHIP THE SHORT", "evidence": ["repo-shorts creative"]},
+            {"type": "CTAEndCard", "duration_seconds": 10, "narration": "Scene five.", "headline": "SHIP THE SHORT", "evidence": ["repo-shorts creative . --final"]},
         ],
         "music_mood": "electronic",
         "total_duration": 50,
@@ -515,7 +515,7 @@ def test_run_creative_pipeline_final_tts_none_copies_video_and_validates_without
         raising=False,
     )
     mock_ingest.return_value = FakeSnapshot()
-    mock_direct.return_value = _final_brief(title="Silent", hook="Silent final")
+    mock_direct.return_value = _final_brief()
     mock_script.return_value = tmp_path / "script.json"
     raw = tmp_path / "video.mp4"
     raw.write_bytes(b"raw")
@@ -558,7 +558,7 @@ def test_run_creative_pipeline_final_fails_bad_validation(
         raising=False,
     )
     mock_ingest.return_value = FakeSnapshot()
-    mock_direct.return_value = _final_brief(title="Bad", hook="Bad")
+    mock_direct.return_value = _final_brief()
     mock_script.return_value = tmp_path / "script.json"
     raw = tmp_path / "video.mp4"
     raw.write_bytes(b"raw")
@@ -837,3 +837,84 @@ def test_final_qa_report_includes_comparison():
 
     result2 = _final_qa_report(qa, None)
     assert "preview_comparison" not in result2
+
+
+def test_build_evidence_manifest_includes_allowed_commands_and_artifacts():
+    from repo_to_shorts.hermes_skill import _build_evidence_manifest
+
+    repo_analysis = {
+        "repo_name": "repo-to-shorts-agent",
+        "description": "Turns repos into short-video packages.",
+        "key_files": ["README.md", "src/repo_to_shorts/cli.py", "tests/test_cli.py"],
+        "components": ["Cli", "Pipeline", "Render"],
+    }
+
+    manifest = _build_evidence_manifest(repo_analysis)
+
+    assert manifest["schema_version"] == 2
+    assert "repo-shorts creative . --final" in manifest["allowed_commands"]
+    assert "repo-shorts analyze . --out runs" in manifest["allowed_commands"]
+    assert "demo.mp4" in manifest["allowed_artifacts"]
+    assert "metadata.json" in manifest["allowed_artifacts"]
+    assert "captions.srt" in manifest["allowed_artifacts"]
+    assert "submission_pack.md" in manifest["allowed_artifacts"]
+    assert "README.md" in manifest["allowed_files"]
+    assert "src/repo_to_shorts/cli.py" in manifest["allowed_files"]
+    assert "./dist/shorts/" not in manifest["allowed_output_paths"]
+    assert "runs/<timestamp>-repo-to-shorts-agent/" in manifest["allowed_output_paths"]
+
+
+@patch("repo_to_shorts.hermes_skill.validate_media")
+@patch("repo_to_shorts.hermes_skill.ingest_target")
+@patch("repo_to_shorts.hermes_skill.direct")
+@patch("repo_to_shorts.hermes_skill.generate_manim_script")
+@patch("repo_to_shorts.hermes_skill.render_scene")
+@patch("repo_to_shorts.hermes_skill._merge_creative_video")
+def test_run_creative_pipeline_revises_brief_after_qa_failure(
+    mock_merge,
+    mock_render,
+    mock_script,
+    mock_direct,
+    mock_ingest,
+    mock_validate,
+    tmp_path: Path,
+):
+    bad = _final_brief(
+        title="Untitled",
+        hook="",
+        scenes=[
+            {"type": "ColdOpen", "headline": "THIS REPO MADE THIS VIDEO", "duration_seconds": 10, "evidence": ["README.md"]},
+            {"type": "PipelineMap", "headline": "REPO BRIEF SCENES RENDER SHIP", "duration_seconds": 12, "evidence": ["src/app.py"]},
+            {"type": "LiveProof", "headline": "PROOF IS IN METADATA.JSON", "duration_seconds": 10, "evidence": ["metadata.json"]},
+            {"type": "ArtifactStack", "headline": "MP4 CAPTIONS SUBMISSION COPY", "duration_seconds": 10, "evidence": ["demo.mp4"]},
+            {"type": "CTAEndCard", "headline": "NPM RUN BUILD-SHORT", "duration_seconds": 8, "evidence": ["output folder: ./dist/shorts/"]},
+        ],
+    )
+    good = _final_brief(
+        title="Repo-to-Shorts Turns Code Into Launch Video",
+        hook="A repo becomes a validated short-video package.",
+        scenes=[
+            {"type": "ColdOpen", "headline": "THIS REPO MADE THIS VIDEO", "duration_seconds": 10, "evidence": ["README.md"]},
+            {"type": "PipelineMap", "headline": "KIMI READS THE REPO", "duration_seconds": 10, "evidence": ["src/app.py"]},
+            {"type": "LiveProof", "headline": "PROOF IS IN METADATA.JSON", "duration_seconds": 10, "evidence": ["metadata.json"]},
+            {"type": "ArtifactStack", "headline": "MP4 CAPTIONS SUBMISSION COPY", "duration_seconds": 10, "evidence": ["demo.mp4", "captions.srt"]},
+            {"type": "CTAEndCard", "headline": "REPO-SHORTS CREATIVE DOT FINAL", "duration_seconds": 10, "evidence": ["repo-shorts creative . --final"]},
+        ],
+    )
+    mock_direct.side_effect = [bad, good]
+    mock_ingest.return_value = FakeSnapshot()
+    mock_script.return_value = tmp_path / "script.json"
+    raw = tmp_path / "video.mp4"
+    raw.write_bytes(b"raw")
+    mock_render.return_value = raw
+    mock_validate.return_value = {"ok": True, "duration_seconds": 45, "resolution": "1080x1920", "has_audio": True, "errors": []}
+
+    result = run_creative_pipeline(".", out_dir=tmp_path, final=True, tts_provider="none", max_revisions=2)
+
+    assert Path(result["run_dir"]).exists()
+    assert mock_direct.call_count == 2
+    assert "invalid_cta_command" in mock_direct.call_args_list[1].kwargs["revision_feedback"]
+    revision_history = json.loads((Path(result["run_dir"]) / "production" / "revision_history.json").read_text(encoding="utf-8"))
+    assert len(revision_history["attempts"]) == 2
+    assert revision_history["attempts"][0]["qa"]["allowed_to_publish"] is False
+    assert revision_history["attempts"][1]["qa"]["allowed_to_publish"] is True

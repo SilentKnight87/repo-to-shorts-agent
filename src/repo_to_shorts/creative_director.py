@@ -36,13 +36,22 @@ def direct(
     final: bool = False,
     design_profile: dict | None = None,
     reference_pack: dict | None = None,
+    revision_feedback: str | None = None,
+    evidence_manifest: dict | None = None,
 ) -> CreativeBrief:
     """Kimi 2.6 creative director: analyze repo → output creative brief."""
     api_key = os.environ.get("OPENROUTER_API_KEY") or os.environ.get("KIMI_API_KEY")
     if not api_key:
         return _deterministic_fallback(repo_analysis, model=model)
 
-    prompt = _build_director_prompt(repo_analysis, final=final, design_profile=design_profile, reference_pack=reference_pack)
+    prompt = _build_director_prompt(
+        repo_analysis,
+        final=final,
+        design_profile=design_profile,
+        reference_pack=reference_pack,
+        revision_feedback=revision_feedback,
+        evidence_manifest=evidence_manifest,
+    )
     try:
         response = _call_openrouter_api(
             prompt,
@@ -69,9 +78,12 @@ def direct(
 def _build_director_prompt(
     analysis: dict,
     *,
+    model: str = "moonshotai/kimi-k2.6",
     final: bool = False,
     design_profile: dict | None = None,
     reference_pack: dict | None = None,
+    revision_feedback: str | None = None,
+    evidence_manifest: dict | None = None,
 ) -> str:
     """Build the creative director prompt from repo analysis."""
     prompt = f"""You are an elite creative director making a hackathon demo video that must feel like Runway/Linear, not a generated slideshow.
@@ -130,6 +142,8 @@ AUDIENCE: technical builders, hackathon judges, AI agent people
 Output valid JSON only as a root object with this exact schema:
 {{
   "schema_version": 1,
+  "title": "specific cinematic title, never generic",
+  "hook": "one concrete one-sentence hook, 12-22 words max",
   "creative_direction": {{
     "angle": "the repo making the video about itself, retro VHS broadcast feel",
     "tone": "wordless VHS broadcast — late-80s news graphics meet cinematic synthwave intro",
@@ -141,7 +155,7 @@ Output valid JSON only as a root object with this exact schema:
       "duration_seconds": 3,
       "headline": "This repo made the video you're watching.",
       "narration": "This repo made the video you're watching.",
-      "evidence": ["repo_name"],
+      "evidence": ["repo_name: {analysis.get('repo_name', '')}"],
       "caption_emphasis": ["repo", "video"]
     }}
   ],
@@ -226,6 +240,30 @@ Additional output fields required in the JSON root:
 - "negative_prompts": list of things to explicitly avoid
 """
         prompt += taste_block
+    if evidence_manifest:
+        evidence_context = json.dumps(evidence_manifest, indent=2)[:4000]
+        prompt += f"""
+
+ALLOWED EVIDENCE:
+{evidence_context}
+
+Factuality rules:
+- Use only values that appear in ALLOWED EVIDENCE lists: allowed_files, allowed_artifacts, allowed_commands, allowed_output_paths, allowed_components, and repo_name.
+- Do not invent npm scripts, output folders, publishing steps, integrations, or files.
+- Do not cite evidence keys like "allowed_commands" or "allowed_artifacts"; always use concrete values (e.g., "repo-shorts creative . --final", "README.md").
+- CTAEndCard must cite one allowed command exactly (or as a substring in a short phrase, e.g., "Run: repo-shorts creative . --final").
+"""
+    if revision_feedback:
+        prompt += f"""
+
+REVISION FEEDBACK:
+{revision_feedback}
+
+Revise the JSON response to fix every QA failure. Do not remove source evidence. Do not add unsupported claims.
+If feedback mentions missing_title, provide a repo-specific root-level "title".
+If feedback mentions missing_hook, provide a root-level "hook" with repo-specific transformation framing.
+For unsupported_evidence, replace any key-like evidence values with concrete allowed evidence values from the ALLOWED EVIDENCE lists.
+"""
     return prompt
 
 

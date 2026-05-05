@@ -17,7 +17,7 @@ from repo_to_shorts.remotion_render import render_remotion_video
 from repo_to_shorts.render import RenderConfig, RenderResult
 from repo_to_shorts.submissions import write_submission_pack
 from repo_to_shorts.taste import build_reference_pack, load_design_profile
-from repo_to_shorts.taste_qa import score_creative_plan
+from repo_to_shorts.taste_qa import _merge_qa_reports, score_creative_plan, score_rendered_artifact
 
 SAFE_FILE_PREFIXES = (
     "src/",
@@ -53,6 +53,7 @@ def run_creative_pipeline(
     generated_music: bool = True,
     command: list[str] | None = None,
     compare_previews: bool = False,
+    max_revisions: int = 2,
 ) -> dict:
     """Full creative pipeline: ingest → Kimi creative director → render → compose.
 
@@ -91,16 +92,23 @@ def run_creative_pipeline(
         _start("kimi_brief", "Calling creative director")
         design_profile = load_design_profile(Path("DESIGN.md"))
         reference_pack = build_reference_pack(Path("DESIGN.md"), Path("docs/taste-research.md"))
-        brief = direct(
+        evidence_manifest = _build_evidence_manifest(repo_analysis)
+        brief, qa_report, revision_history = _direct_with_qa_revisions(
             repo_analysis,
-            model=kimi_model or "moonshotai/kimi-k2.6",
+            kimi_model=kimi_model,
             final=final,
             design_profile=design_profile,
             reference_pack=reference_pack,
+            evidence_manifest=evidence_manifest,
+            max_revisions=max_revisions,
         )
         if preview:
             brief.scenes = _preview_scenes(brief.scenes)
             brief.total_duration = int(sum(float(scene.get("duration_seconds", 4)) for scene in brief.scenes))
+            brief_manifest = _brief_to_manifest(brief)
+            qa_report = score_creative_plan(brief_manifest, design_profile=design_profile, evidence_manifest=evidence_manifest, mode="preview")
+        else:
+            brief_manifest = _brief_to_manifest(brief)
         if final:
             _validate_final_brief(brief)
 
@@ -108,18 +116,30 @@ def run_creative_pipeline(
         if compare_previews and preview:
             candidates = [brief, _make_concise_candidate(brief), _make_proof_first_candidate(brief)]
             brief, comparison_report = _select_best_preview_candidate(candidates, design_profile)
-
-        brief_manifest = _brief_to_manifest(brief)
-        qa_report = score_creative_plan(brief_manifest, design_profile=design_profile)
-        if final and not qa_report["allowed_to_publish"]:
-            defects = ", ".join(issue["defect"] for issue in qa_report["blocking_issues"])
-            raise RuntimeError(f"Taste QA failed before render: {defects}")
+            brief_manifest = _brief_to_manifest(brief)
+            qa_report = score_creative_plan(brief_manifest, design_profile=design_profile, evidence_manifest=evidence_manifest, mode="preview")
 
         _complete("kimi_brief", f"Brief: {brief.title}")
 
         timestamp = datetime.now().strftime("%Y%m%d-%H%M%S")
         run_dir = Path(out_dir) / f"{timestamp}-{_slug(snapshot.name)}"
         run_dir.mkdir(parents=True, exist_ok=True)
+
+        if final and not qa_report["allowed_to_publish"]:
+            write_production_manifests(
+                run_dir,
+                design_profile=design_profile,
+                reference_pack=reference_pack,
+                evidence_manifest=evidence_manifest,
+                creative_brief=brief_manifest,
+                scene_plan={"schema_version": 1, "scenes": brief.scenes},
+                asset_manifest={"schema_version": 1, "assets": []},
+                audio_plan={"schema_version": 1, "mode": "not_rendered"},
+                qa_report=_final_qa_report(qa_report, comparison_report),
+                revision_history={"schema_version": 1, "attempts": revision_history},
+            )
+            defects = ", ".join(issue["defect"] for issue in qa_report["blocking_issues"] + qa_report.get("factual_issues", []))
+            raise RuntimeError(f"Taste QA failed before render: {defects}")
 
         kimi_metadata = _build_kimi_metadata(brief, kimi_model)
 
@@ -242,7 +262,7 @@ def run_creative_pipeline(
             run_dir,
             design_profile=design_profile,
             reference_pack=reference_pack,
-            evidence_manifest=_build_evidence_manifest(repo_analysis),
+            evidence_manifest=evidence_manifest,
             creative_brief=brief_manifest,
             scene_plan={"schema_version": 1, "scenes": brief.scenes},
             asset_manifest={"schema_version": 1, "assets": []},
@@ -254,9 +274,15 @@ def run_creative_pipeline(
                 "generated_music": generated_music,
             },
             qa_report=_final_qa_report(qa_report, comparison_report),
+            revision_history={"schema_version": 1, "attempts": revision_history},
         )
         for p in production_paths:
             metadata["artifacts"].append("production/" + p.name)
+        artifact_qa_report = score_rendered_artifact(metadata=metadata, evidence_manifest=evidence_manifest) if final else qa_report
+        combined_qa_report = _merge_qa_reports(qa_report, artifact_qa_report)
+        if final and combined_qa_report is not qa_report:
+            combined_q_path = run_dir / "production" / "qa_report.json"
+            combined_q_path.write_text(json.dumps(_final_qa_report(combined_qa_report, comparison_report), indent=2, sort_keys=True) + "\n", encoding="utf-8")
         write_submission_pack(
             run_dir,
             command=command or ["repo-shorts", "creative", target],
@@ -265,6 +291,10 @@ def run_creative_pipeline(
         )
         (run_dir / "metadata.json").write_text(json.dumps(metadata, indent=2) + "\n", encoding="utf-8")
         _complete("finalize", "Artifacts packaged")
+
+        if final and not combined_qa_report["allowed_to_publish"]:
+            defects = ", ".join(issue["defect"] for issue in combined_qa_report["blocking_issues"] + combined_qa_report.get("factual_issues", []))
+            raise RuntimeError(f"Post-render QA failed: {defects}")
 
         return {"output": str(final_video), "run_dir": str(run_dir)}
     except Exception as exc:
@@ -582,12 +612,47 @@ def _slug(value: str) -> str:
 
 
 def _build_evidence_manifest(repo_analysis: dict) -> dict:
+    repo_name = str(repo_analysis.get("repo_name") or "repo").strip() or "repo"
+    safe_files = list(repo_analysis.get("key_files") or [])
+    components = list(repo_analysis.get("components") or [])
     return {
-        "schema_version": 1,
-        "repo_name": repo_analysis.get("repo_name"),
+        "schema_version": 2,
+        "repo_name": repo_name,
         "description": repo_analysis.get("description"),
-        "safe_files": repo_analysis.get("key_files", []),
-        "components": repo_analysis.get("components", []),
+        "allowed_files": safe_files,
+        "allowed_components": components,
+        "allowed_artifacts": [
+            "demo.mp4",
+            "metadata.json",
+            "captions.srt",
+            "submission_pack.md",
+            "production/design_profile.json",
+            "production/reference_pack.json",
+            "production/evidence_manifest.json",
+            "production/creative_brief.json",
+            "production/scene_plan.json",
+            "production/asset_manifest.json",
+            "production/audio_plan.json",
+            "production/qa_report.json",
+            "production/revision_history.json",
+        ],
+        "allowed_commands": [
+            "repo-shorts creative . --final",
+            "repo-shorts creative . --preview --skip-audio",
+            "repo-shorts creative . --preview --compare-previews",
+            "repo-shorts analyze . --out runs",
+        ],
+        "allowed_output_paths": [
+            f"runs/<timestamp>-{_slug(repo_name)}/",
+            "runs/<timestamp>-<repo>/",
+        ],
+        "forbidden_claims": [
+            "npm run build-short",
+            "./dist/shorts/",
+            "external publishing",
+            "auto-posted to X",
+            "uploaded to Discord",
+        ],
     }
 
 
@@ -664,3 +729,46 @@ def _final_qa_report(qa_report: dict, comparison_report: dict | None) -> dict:
         report["preview_comparison"] = comparison_report
         return report
     return qa_report
+
+
+def _direct_with_qa_revisions(
+    repo_analysis: dict,
+    *,
+    kimi_model: str | None,
+    final: bool,
+    design_profile: dict,
+    reference_pack: dict,
+    evidence_manifest: dict,
+    max_revisions: int,
+) -> tuple[object, dict, list[dict]]:
+    attempts: list[dict] = []
+    revision_feedback: str | None = None
+    total_attempts = max(1, max_revisions + 1)
+    brief = None
+    qa_report: dict = {}
+    for attempt_number in range(1, total_attempts + 1):
+        brief = direct(
+            repo_analysis,
+            model=kimi_model or "moonshotai/kimi-k2.6",
+            final=final,
+            design_profile=design_profile,
+            reference_pack=reference_pack,
+            revision_feedback=revision_feedback,
+            evidence_manifest=evidence_manifest,
+        )
+        brief_manifest = _brief_to_manifest(brief)
+        qa_report = score_creative_plan(
+            brief_manifest,
+            design_profile=design_profile,
+            evidence_manifest=evidence_manifest,
+            mode="final" if final else "preview",
+        )
+        attempts.append({
+            "attempt": attempt_number,
+            "title": brief_manifest.get("title"),
+            "qa": qa_report,
+        })
+        if not final or qa_report["allowed_to_publish"]:
+            return brief, qa_report, attempts
+        revision_feedback = qa_report.get("revision_prompt") or "Revise the brief to satisfy QA."
+    return brief, qa_report, attempts

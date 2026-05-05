@@ -130,3 +130,20 @@ def test_creative_accepts_compare_previews_flag(monkeypatch, tmp_path):
 
     assert result.exit_code == 0
     assert calls[0]["compare_previews"] is True
+
+
+def test_creative_passes_max_revisions(monkeypatch, tmp_path):
+    seen = {}
+
+    def fake_run_creative_pipeline(*args, **kwargs):
+        seen.update(kwargs)
+        run_dir = tmp_path / "run"
+        run_dir.mkdir()
+        return {"output": str(run_dir / "demo.mp4"), "run_dir": str(run_dir)}
+
+    monkeypatch.setattr("repo_to_shorts.hermes_skill.run_creative_pipeline", fake_run_creative_pipeline)
+
+    result = runner.invoke(app, ["creative", ".", "--out", str(tmp_path), "--max-revisions", "1"])
+
+    assert result.exit_code == 0
+    assert seen["max_revisions"] == 1

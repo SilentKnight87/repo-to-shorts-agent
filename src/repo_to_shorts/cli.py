@@ -77,6 +77,7 @@ def creative(
         help="Generate ambient music when no --music is supplied.",
     ),
     compare_previews: bool = typer.Option(False, "--compare-previews", help="Generate and score preview concept variants before rendering."),
+    max_revisions: int = typer.Option(2, "--max-revisions", min=0, max=5, help="Maximum Kimi QA revision attempts before final failure."),
 ) -> None:
     """Generate a creative short video with Kimi 2.6 creative direction.
 
@@ -103,6 +104,10 @@ def creative(
         command.extend(["--voice", voice])
     if not generated_music:
         command.append("--no-generated-music")
+    if max_revisions != 2:
+        command.extend(["--max-revisions", str(max_revisions)])
+    if compare_previews:
+        command.append("--compare-previews")
 
     try:
         result = run_creative_pipeline(
@@ -120,6 +125,7 @@ def creative(
             generated_music=generated_music,
             command=command,
             compare_previews=compare_previews,
+            max_revisions=max_revisions,
         )
     except Exception as exc:  # noqa: BLE001
         raise typer.BadParameter(str(exc)) from exc

@@ -13,6 +13,7 @@ MANIFEST_NAMES = {
     "asset_manifest": "asset_manifest.json",
     "audio_plan": "audio_plan.json",
     "qa_report": "qa_report.json",
+    "revision_history": "revision_history.json",
 }
 
 

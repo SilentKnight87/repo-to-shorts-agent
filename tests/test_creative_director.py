@@ -105,6 +105,8 @@ def test_final_director_prompt_requires_postable_duration_and_secret_filtering()
     assert ".env" in prompt
     assert "secret" in prompt.lower()
     assert "concrete repo evidence" in prompt.lower()
+    assert "\"title\":" in prompt
+    assert "\"hook\":" in prompt
 
 
 def test_final_director_prompt_requests_remotion_scene_contract():
@@ -125,6 +127,7 @@ def test_final_director_prompt_requests_remotion_scene_contract():
     assert "LiveProof" in prompt
     assert "CTAEndCard" in prompt
     assert "evidence" in prompt
+    assert "repo_name: repo-to-shorts" in prompt
     assert "caption_emphasis" in prompt
     assert "Do not make generic architecture slides" in prompt
 
@@ -325,3 +328,31 @@ def test_direct_passes_taste_args(monkeypatch):
     assert result.distribution_channel == "x_short"
     assert "DESIGN PROFILE" in calls[0]
     assert "REFERENCE PACK" in calls[0]
+
+
+def test_director_prompt_includes_revision_feedback_and_allowed_evidence():
+    prompt = _build_director_prompt(
+        {
+            "repo_name": "repo-to-shorts-agent",
+            "description": "Turns repos into videos.",
+            "key_files": ["README.md"],
+            "components": ["Cli"],
+        },
+        model="moonshotai/kimi-k2.6",
+        final=True,
+        design_profile={"schema_version": 1},
+        reference_pack={"schema_version": 1},
+        revision_feedback="invalid_cta_command: use repo-shorts creative . --final",
+        evidence_manifest={
+            "allowed_commands": ["repo-shorts creative . --final"],
+            "allowed_artifacts": ["demo.mp4", "metadata.json"],
+            "allowed_files": ["README.md"],
+            "forbidden_claims": ["npm run build-short"],
+        },
+    )
+
+    assert "REVISION FEEDBACK" in prompt
+    assert "invalid_cta_command" in prompt
+    assert "ALLOWED EVIDENCE" in prompt
+    assert "repo-shorts creative . --final" in prompt
+    assert "npm run build-short" in prompt
