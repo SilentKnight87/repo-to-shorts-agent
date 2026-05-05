@@ -641,6 +641,7 @@ def _make_handler(runs_dir: Path):
                             preview=preview,
                             skip_audio=skip_audio,
                             final=final,
+                            tts_provider="none" if skip_audio else "edge",
                         )
                         run_dir = Path(result["run_dir"])
                     else:

@@ -360,6 +360,44 @@ class TestGenerateFinalMode:
         assert calls[0]["final"] is True
         assert calls[0]["preview"] is False
 
+    def test_generate_creative_final_mode_maps_skip_audio_to_no_tts(self, tmp_path: Path, monkeypatch):
+        calls = []
+
+        def fake_run_creative_pipeline(target, audience, out_dir, **kwargs):
+            calls.append(kwargs)
+            run_dir = tmp_path / "20260504-final"
+            run_dir.mkdir(parents=True, exist_ok=True)
+            metadata = {
+                "artifacts": ["demo.mp4", "metadata.json"],
+                "kimi": {"mode": "live-api"},
+                "render": {"mode": "mp4", "final": True, "validation": {"ok": True, "errors": []}},
+                "creative_brief": {"title": "Final", "hook": "Final hook", "scenes": []},
+            }
+            (run_dir / "metadata.json").write_text(json.dumps(metadata), encoding="utf-8")
+            (run_dir / "demo.mp4").write_bytes(b"mp4")
+            return {"output": str(run_dir / "demo.mp4"), "run_dir": str(run_dir)}
+
+        monkeypatch.setattr("repo_to_shorts.hermes_skill.run_creative_pipeline", fake_run_creative_pipeline)
+
+        server, port = _start_server(tmp_path)
+        try:
+            data = urllib.parse.urlencode({
+                "target": ".",
+                "audience": "builders",
+                "kimi_model": "moonshotai/kimi-k2.6",
+                "creative_mode": "on",
+                "final": "on",
+                "skip_audio": "on",
+            }).encode()
+            req = urllib.request.Request(f"http://127.0.0.1:{port}/generate", data=data, method="POST")
+            with urllib.request.urlopen(req) as resp:
+                assert resp.status == 200
+        finally:
+            _stop_server(server)
+
+        assert calls[0]["skip_audio"] is True
+        assert calls[0]["tts_provider"] == "none"
+
     def test_generate_creative_final_mode_shows_broadcast_complete(self, tmp_path: Path, monkeypatch):
         def fake_run_creative_pipeline(target, audience, out_dir, **kwargs):
             run_dir = tmp_path / "20260504-final"
