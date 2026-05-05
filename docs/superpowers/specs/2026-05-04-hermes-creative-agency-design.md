@@ -97,6 +97,15 @@ The plan should treat "taste" as an operational system:
 6. **Human-calibrated eval set:** collect 20-50 known repos/runs over time with expected quality notes, then replay them before changing creative prompts or adapters.
 7. **No vibe-only success:** a final run is publishable only when deterministic validation and taste QA both pass.
 
+Hermes's X taste pass turned those principles into buildable constraints. The important findings are:
+
+- **References beat vibes:** the pipeline needs a `reference_pack`, not just adjectives like "premium" or "cinematic."
+- **Judgment is separate from generation:** preview mode should be able to generate 2-3 candidate hooks/styles, score them, and either choose the strongest or ask the user.
+- **Functional is only the floor:** default cards, generic gradients, centered hero text, and unmotivated motion are explicit anti-slop patterns.
+- **Taste means precise diagnosis:** evaluator output should name a defect, cite evidence, and propose a repair.
+- **Video quality starts in pre-production:** the plan needs `visual_world`, `shot_list`, `motion_principles`, `continuity_rules`, and `negative_prompts`.
+- **Trust and audience are part of taste:** the final asset should be judged by whether it would build trust with the target audience on the chosen distribution channel.
+
 ### Hermes Skills
 
 Hermes skills are the right abstraction for repeatable creative procedures, not for hiding all runtime complexity inside a single prompt. The local Hermes skill inventory includes:
@@ -279,6 +288,8 @@ Add a new intermediate package under each run:
 ```text
 runs/<timestamp>-<repo>/
   production/
+    design_profile.json
+    reference_pack.json
     evidence_manifest.json
     creative_brief.json
     scene_plan.json
@@ -295,6 +306,38 @@ runs/<timestamp>-<repo>/
   "schema_version": 1,
   "angle": "repo-native launch short",
   "audience": "technical judges",
+  "distribution_channel": "x_short",
+  "reference_pack": [
+    {
+      "label": "premium console",
+      "source": "DESIGN.md",
+      "borrow": ["restrained palette", "repo proof chips", "kinetic code text"],
+      "avoid": ["purple-blue gradient hero", "three generic cards"]
+    }
+  ],
+  "visual_world": "cinematic engineering console",
+  "motion_principles": [
+    "motion guides attention",
+    "holds land on proof",
+    "no ambient movement without narrative purpose"
+  ],
+  "shot_list": [
+    "raw repo input",
+    "agent analysis graph",
+    "scene strip",
+    "proof metadata",
+    "generated trailer output"
+  ],
+  "continuity_rules": [
+    "one accent color family per run",
+    "same proof chip styling across scenes",
+    "captions stay inside 9:16 safe area"
+  ],
+  "negative_prompts": [
+    "generic AI SaaS soup",
+    "default three-card grid",
+    "abstract shapes before product context"
+  ],
   "tone": "sharp, cinematic, builder-focused",
   "visual_language": {
     "palette": ["#0b0707", "#f0e8d8", "#ff8c4a", "#38d8ff"],
@@ -372,6 +415,8 @@ Visual checks:
 - OCR or layout probes for caption readability if practical
 - image histogram/blank-frame detection
 - repeated-layout detection using frame similarity
+- detect default-looking compositions such as generic gradients, centered vague headline, repeated card grids, and unmotivated motion
+- verify `DESIGN.md` palette/radius/type constraints are followed by rendered scenes
 
 Critic review:
 
@@ -379,6 +424,7 @@ Critic review:
 - require structured output with pass/fail and concrete fixes
 - allow exactly one revision pass by default
 - never let critic text override deterministic failures
+- require every issue to include `defect`, `evidence`, and `fix`
 
 The critic rubric should have concrete categories:
 
@@ -395,6 +441,28 @@ The critic rubric should have concrete categories:
 | Craft | feels intentionally edited | repeated layout, blank frames, rough timing |
 | Truth | metadata and mode are honest | fake live proof, hidden validation failure |
 
+The first concrete scorecard should use the Hermes X taste rubric:
+
+| Category | Weight |
+|---|---:|
+| Hook clarity | 20% |
+| Specificity to repo | 20% |
+| Visual craft | 20% |
+| Caption/copy quality | 15% |
+| Pacing/audio | 15% |
+| Distribution fit | 10% |
+
+Preview fails if any of these anti-slop checks are true:
+
+- primary caption is cropped or outside safe area
+- primary caption has more than 12 words on screen
+- more than two scenes use the same layout without intentional repetition
+- palette introduces random colors outside `DESIGN.md`
+- output could describe any AI repo by swapping the name
+- first scene does not reveal project purpose or transformation
+- final scene has no artifact, proof, or CTA
+- voice sounds like generic old AI narration with no supporting music bed
+
 For agent QA, evaluate both output and trajectory:
 
 - did Kimi choose tools that match the scene purpose?
@@ -407,7 +475,14 @@ This turns "knowing good creative" into a recorded decision process that can imp
 
 ## Reference Bank
 
-Create a repo-local reference bank before adding more creative adapters:
+Create a repo-local reference bank before adding more creative adapters.
+
+The seed artifacts are:
+
+- `DESIGN.md`: persistent product taste profile for visual identity, tokens, components, and anti-slop rules.
+- `docs/taste-research.md`: Hermes/X-derived taste research notes, public examples, score rubric, and next build steps.
+
+Then expand into:
 
 ```text
 docs/creative-reference-bank/
@@ -453,11 +528,14 @@ Required changes:
 
 Deliverables:
 
+- keep `DESIGN.md` as the persistent taste profile read by agents and the renderer
+- keep `docs/taste-research.md` as the first X-derived calibration artifact
 - collect 15-30 public examples from X, GitHub, YouTube, Remotion examples, ComfyUI workflows, design galleries, and short-form launch videos
 - classify each example as excellent, useful-but-flawed, or rejected
 - extract the specific traits worth copying or avoiding
 - seed `docs/creative-reference-bank/`
 - convert the findings into 8-12 concrete QA checks before writing creative-adapter code
+- define `reference_pack.json` and `design_profile.json` schemas
 
 This phase should be time-boxed. The goal is not infinite taste research; it is to give Kimi, Hermes, and the QA critic concrete examples before implementation starts.
 
@@ -485,6 +563,8 @@ This phase addresses the current "demo not fully working" concern before adding 
 
 Deliverables:
 
+- `design_profile.json`
+- `reference_pack.json`
 - `evidence_manifest.json`
 - `creative_brief.json`
 - `scene_plan.json`
@@ -499,6 +579,8 @@ This makes the workflow inspectable and gives Kimi/Hermes handoff points.
 
 Deliverables:
 
+- pre-render plan scoring before expensive media generation
+- preview comparison mode that generates 2-3 candidate hooks/styles and scores them
 - contact sheet generation
 - deterministic QA checks
 - structured critic pass
