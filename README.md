@@ -32,7 +32,7 @@ Requires system `ffmpeg` and `ffprobe`. For Remotion rendering, also needs Node.
 4. **Renderer** animates the scenes at 1080×1920 — Remotion (React + ffmpeg) when Node.js is available, Pillow + ffmpeg as honest fallback
 5. **Compositor** generates optional TTS narration, ambient music, and mixes audio into the final MP4
 6. **Media validation** verifies resolution, duration, and audio streams before declaring success
-7. **Output:** `demo.mp4`, `metadata.json` (live Kimi proof), `captions.srt`, `submission_pack.md`, and a contact sheet
+7. **Output:** `demo.mp4`, `metadata.json` (live Kimi proof), `captions.srt`, `submission_pack.md`, and production QA manifests
 
 All of this runs from one browser click, one Hermes Agent command, or one CLI invocation.
 
@@ -279,13 +279,15 @@ Every creative run writes a `production/` directory with structured manifests:
 
 The web UI toggles (SP/LP/EP) map to these modes. SP = preview silent, LP = preview with optional audio, EP = final export. The success page label changes from "PACKAGE COMPLETE" to "PREVIEW DRAFT" to "BROADCAST COMPLETE" (or "VALIDATION FAILED") based on `metadata.json` render state.
 
-### Taste QA
+### Taste QA and revision loop
 
 Before rendering, the pipeline runs a deterministic taste QA pass on the creative brief. This uses structured issue reporting (`defect`, `evidence`, `fix`) rather than vague "looks bad" feedback.
 
 The QA checks for:
 - **Blocking issues** (fail the run): weak hooks, missing CTA, no repo specificity
 - **Taste issues** (warn, don't block): caption density, generic AI copy, layout repetition
+
+When `--final` is enabled, failures feed a bounded revision loop that re-prompts Kimi with QA feedback (up to `--max-revisions`). If blocking issues remain after retries, the run fails with `qa_report.json` and `revision_history.json` preserved for inspection.
 
 QA results are written to `production/qa_report.json` and may include a `preview_comparison` section when `--compare-previews` is used.
 
@@ -378,7 +380,7 @@ npm install
 ## Development
 
 ```bash
-.venv/bin/python -m pytest -q        # 160 tests
+.venv/bin/python -m pytest -q        # 170 tests
 .venv/bin/ruff check .               # lint
 .venv/bin/repo-shorts web            # start UI
 ```

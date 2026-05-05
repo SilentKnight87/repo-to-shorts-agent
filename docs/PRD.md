@@ -32,33 +32,37 @@ This two-front strategy is stronger than a token model call because Kimi is both
 
 See `docs/HACKATHON_STRATEGY.md` for submission narrative and demo framing.
 
-## Current truth, May 3
+## Current truth, May 5, 2026
 
-The repo is currently a CLI-first MVP with static output serving. It is not yet an interactive website.
+The repo is now a CLI + local web product with end-to-end creative generation, including final MP4 rendering, deterministic + live Kimi modes, and production QA manifests.
 
-Current shipped path:
+Current shipped paths:
 
 ```text
-repo target, local path or GitHub URL
+repo-shorts analyze <target>
   -> repo snapshot
   -> deterministic story package
   -> Kimi critic/script-editor, live via OpenRouter when key is present, honest fallback otherwise
   -> Markdown + SVG + SRT + HTML launch artifacts
-  -> optional Pillow + ffmpeg vertical MP4
-  -> static file server can show generated runs
+
+repo-shorts creative <target> --preview|--final
+  -> ingest + evidence manifest
+  -> Kimi creative brief
+  -> deterministic taste QA + bounded revision loop
+  -> Remotion (or honest fallback renderer) MP4 render
+  -> media validation + production manifests
+  -> browser-viewable run archive
 ```
 
-Current non-existent path:
+Current deferred/non-goal path:
 
 ```text
-browser form
-  -> paste GitHub URL
-  -> click Generate
-  -> wait for job status
-  -> view latest demo.html/demo.mp4 links
+hosted multi-user cloud service
+  -> authentication + DB + queues + billing + publishing
+  -> not part of hackathon/local MVP scope
 ```
 
-That web UI is the next planned feature. Until it is built, the product is tested through the CLI and viewed through generated artifacts.
+The local web UI exists now (`repo-shorts web`) and wraps the same pipeline engine.
 
 ## Current capability table
 
@@ -73,7 +77,7 @@ That web UI is the next planned feature. Until it is built, the product is teste
 | Honest Kimi fallback | Built | `deterministic-fallback` and `api-error-fallback` metadata modes |
 | Optional MP4 render | Built | `--render mp4`, Pillow + ffmpeg, `demo.mp4` |
 | Static run viewing | Available ad hoc | local static server over generated `runs/` |
-| Interactive web UI | Not built | planned in `docs/plans/2026-05-03-local-web-ui-plan.md` |
+| Interactive web UI | Built | `repo-shorts web` + `src/repo_to_shorts/web.py` |
 | Public posting/submission | Not built by design | requires maintainer approval |
 
 ## Users
