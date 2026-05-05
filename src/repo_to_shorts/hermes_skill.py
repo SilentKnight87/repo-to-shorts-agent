@@ -11,10 +11,13 @@ from repo_to_shorts.creative_director import direct
 from repo_to_shorts.ingest import ingest_target
 from repo_to_shorts.manim_render import generate_manim_script, render_scene
 from repo_to_shorts.media_validation import validate_media
+from repo_to_shorts.production import write_production_manifests
 from repo_to_shorts.progress import ProgressTracker
 from repo_to_shorts.remotion_render import render_remotion_video
 from repo_to_shorts.render import RenderConfig, RenderResult
 from repo_to_shorts.submissions import write_submission_pack
+from repo_to_shorts.taste import build_reference_pack, load_design_profile
+from repo_to_shorts.taste_qa import score_creative_plan
 
 SAFE_FILE_PREFIXES = (
     "src/",
@@ -49,6 +52,7 @@ def run_creative_pipeline(
     voice: str | None = None,
     generated_music: bool = True,
     command: list[str] | None = None,
+    compare_previews: bool = False,
 ) -> dict:
     """Full creative pipeline: ingest → Kimi creative director → render → compose.
 
@@ -85,12 +89,32 @@ def run_creative_pipeline(
         _complete("analyze", f"Analyzed {repo_analysis.get('repo_name', 'repo')}")
 
         _start("kimi_brief", "Calling creative director")
-        brief = direct(repo_analysis, model=kimi_model or "moonshotai/kimi-k2.6", final=final)
+        design_profile = load_design_profile(Path("DESIGN.md"))
+        reference_pack = build_reference_pack(Path("DESIGN.md"), Path("docs/taste-research.md"))
+        brief = direct(
+            repo_analysis,
+            model=kimi_model or "moonshotai/kimi-k2.6",
+            final=final,
+            design_profile=design_profile,
+            reference_pack=reference_pack,
+        )
         if preview:
             brief.scenes = _preview_scenes(brief.scenes)
             brief.total_duration = int(sum(float(scene.get("duration_seconds", 4)) for scene in brief.scenes))
         if final:
             _validate_final_brief(brief)
+
+        comparison_report = None
+        if compare_previews and preview:
+            candidates = [brief, _make_concise_candidate(brief), _make_proof_first_candidate(brief)]
+            brief, comparison_report = _select_best_preview_candidate(candidates, design_profile)
+
+        brief_manifest = _brief_to_manifest(brief)
+        qa_report = score_creative_plan(brief_manifest, design_profile=design_profile)
+        if final and not qa_report["allowed_to_publish"]:
+            defects = ", ".join(issue["defect"] for issue in qa_report["blocking_issues"])
+            raise RuntimeError(f"Taste QA failed before render: {defects}")
+
         _complete("kimi_brief", f"Brief: {brief.title}")
 
         timestamp = datetime.now().strftime("%Y%m%d-%H%M%S")
@@ -214,6 +238,25 @@ def run_creative_pipeline(
                 "metadata.json",
             ],
         }
+        production_paths = write_production_manifests(
+            run_dir,
+            design_profile=design_profile,
+            reference_pack=reference_pack,
+            evidence_manifest=_build_evidence_manifest(repo_analysis),
+            creative_brief=brief_manifest,
+            scene_plan={"schema_version": 1, "scenes": brief.scenes},
+            asset_manifest={"schema_version": 1, "assets": []},
+            audio_plan={
+                "schema_version": 1,
+                "mode": "skipped" if skip_audio else "voiceover_with_ducked_music",
+                "tts_provider": tts_provider,
+                "fallback_tts_provider": fallback_tts_provider,
+                "generated_music": generated_music,
+            },
+            qa_report=_final_qa_report(qa_report, comparison_report),
+        )
+        for p in production_paths:
+            metadata["artifacts"].append("production/" + p.name)
         write_submission_pack(
             run_dir,
             command=command or ["repo-shorts", "creative", target],
@@ -536,3 +579,88 @@ def _slug(value: str) -> str:
     while "--" in slug:
         slug = slug.replace("--", "-")
     return slug[:60] or "repo"
+
+
+def _build_evidence_manifest(repo_analysis: dict) -> dict:
+    return {
+        "schema_version": 1,
+        "repo_name": repo_analysis.get("repo_name"),
+        "description": repo_analysis.get("description"),
+        "safe_files": repo_analysis.get("key_files", []),
+        "components": repo_analysis.get("components", []),
+    }
+
+
+def _brief_to_manifest(brief) -> dict:
+    def _safe(name: str, default):
+        val = getattr(brief, name, default)
+        if val is not None and type(val).__name__ == "MagicMock":
+            return default
+        return val
+
+    return {
+        "schema_version": 1,
+        "style": _safe("style", ""),
+        "title": _safe("title", ""),
+        "hook": _safe("hook", ""),
+        "distribution_channel": _safe("distribution_channel", "x_short"),
+        "reference_pack": _safe("reference_pack", []),
+        "visual_world": _safe("visual_world", ""),
+        "motion_principles": _safe("motion_principles", []),
+        "shot_list": _safe("shot_list", []),
+        "continuity_rules": _safe("continuity_rules", []),
+        "negative_prompts": _safe("negative_prompts", []),
+        "scenes": _safe("scenes", []),
+        "music_mood": _safe("music_mood", ""),
+        "total_duration": _safe("total_duration", 0),
+    }
+
+
+def _select_best_preview_candidate(candidates: list, design_profile: dict) -> tuple:
+    scored = []
+    for index, candidate in enumerate(candidates):
+        report = score_creative_plan(_brief_to_manifest(candidate), design_profile=design_profile)
+        scored.append((float(report["score"]), index, candidate, report))
+    scored.sort(key=lambda item: item[0], reverse=True)
+    score, index, candidate, report = scored[0]
+    return candidate, {
+        "schema_version": 1,
+        "candidate_count": len(candidates),
+        "selected_index": index,
+        "selected_score": score,
+        "candidates": [item[3] for item in scored],
+    }
+
+
+def _make_concise_candidate(brief) -> object:
+    import copy
+    c = copy.copy(brief)
+    short_scenes = []
+    for scene in getattr(brief, "scenes", []):
+        s = dict(scene)
+        headline = str(s.get("headline", ""))
+        words = headline.split()[:6]
+        s["headline"] = " ".join(words) if len(words) >= 3 else headline
+        if "duration_seconds" in s:
+            s["duration_seconds"] = min(float(s["duration_seconds"]), 7)
+        short_scenes.append(s)
+    c.scenes = short_scenes[:4]
+    return c
+
+
+def _make_proof_first_candidate(brief) -> object:
+    import copy
+    c = copy.copy(brief)
+    scenes = [dict(s) for s in getattr(brief, "scenes", [])]
+    proof_scenes = [s for s in scenes if str(s.get("type", "")).lower() in ("liveproof", "repoevidence")]
+    other_scenes = [s for s in scenes if s not in proof_scenes]
+    c.scenes = proof_scenes[:1] + other_scenes[:4]
+    return c
+
+
+def _final_qa_report(qa_report: dict, comparison_report: dict | None) -> dict:
+    if comparison_report:
+        report = dict(qa_report)
+        report["preview_comparison"] = comparison_report
+        return report
+    return qa_report

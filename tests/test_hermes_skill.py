@@ -22,17 +22,25 @@ def _final_brief(**overrides):
         "title": "Final Title",
         "hook": "Final hook",
         "scenes": [
-            {"duration_seconds": 10, "narration": "Scene one."},
-            {"duration_seconds": 10, "narration": "Scene two."},
-            {"duration_seconds": 10, "narration": "Scene three."},
-            {"duration_seconds": 10, "narration": "Scene four."},
-            {"duration_seconds": 10, "narration": "Scene five."},
+            {"type": "ColdOpen", "duration_seconds": 10, "narration": "Scene one.", "headline": "REPO BECOMES REEL", "evidence": ["repo_name"]},
+            {"type": "PipelineMap", "duration_seconds": 10, "narration": "Scene two.", "headline": "KIMI READS THE REPO", "evidence": ["src/pipeline.py"]},
+            {"type": "LiveProof", "duration_seconds": 10, "narration": "Scene three.", "headline": "PROOF IN METADATA", "evidence": ["metadata.json"]},
+            {"type": "ArtifactStack", "duration_seconds": 10, "narration": "Scene four.", "headline": "SHORT PACKAGE BUILT", "evidence": ["demo.mp4"]},
+            {"type": "CTAEndCard", "duration_seconds": 10, "narration": "Scene five.", "headline": "SHIP THE SHORT", "evidence": ["repo-shorts creative"]},
         ],
         "music_mood": "electronic",
         "total_duration": 50,
         "mode": "live-api",
         "provider": "openrouter",
         "model": "moonshotai/kimi-k2.6",
+        "distribution_channel": "x_short",
+        "reference_pack": [],
+        "visual_world": "cinematic engineering console",
+        "motion_principles": [],
+        "shot_list": [],
+        "continuity_rules": [],
+        "negative_prompts": [],
+        "quality_bar": {},
     }
     values.update(overrides)
     return MagicMock(**values)
@@ -185,20 +193,7 @@ def test_run_creative_pipeline_final_writes_validation_submission_and_srt(
         raising=False,
     )
     mock_ingest.return_value = FakeSnapshot()
-    mock_direct.return_value = MagicMock(
-        style="dark-terminal",
-        title="Final Title",
-        hook="Final hook",
-        scenes=[
-            {"duration_seconds": 10, "narration": "Scene one."},
-            {"duration_seconds": 10, "narration": "Scene two."},
-            {"duration_seconds": 10, "narration": "Scene three."},
-            {"duration_seconds": 10, "narration": "Scene four."},
-            {"duration_seconds": 10, "narration": "Scene five."},
-        ],
-        music_mood="electronic",
-        total_duration=50,
-    )
+    mock_direct.return_value = _final_brief()
     mock_script.return_value = tmp_path / "script.json"
     raw = tmp_path / "video.mp4"
     raw.write_bytes(b"raw")
@@ -520,14 +515,7 @@ def test_run_creative_pipeline_final_tts_none_copies_video_and_validates_without
         raising=False,
     )
     mock_ingest.return_value = FakeSnapshot()
-    mock_direct.return_value = MagicMock(
-        style="dark-terminal",
-        title="Silent",
-        hook="Silent final",
-        scenes=[{"duration_seconds": 10, "narration": "Scene."} for _ in range(5)],
-        music_mood="electronic",
-        total_duration=50,
-    )
+    mock_direct.return_value = _final_brief(title="Silent", hook="Silent final")
     mock_script.return_value = tmp_path / "script.json"
     raw = tmp_path / "video.mp4"
     raw.write_bytes(b"raw")
@@ -570,14 +558,7 @@ def test_run_creative_pipeline_final_fails_bad_validation(
         raising=False,
     )
     mock_ingest.return_value = FakeSnapshot()
-    mock_direct.return_value = MagicMock(
-        style="dark-terminal",
-        title="Bad",
-        hook="Bad",
-        scenes=[{"duration_seconds": 10, "narration": "Scene."} for _ in range(5)],
-        music_mood="electronic",
-        total_duration=50,
-    )
+    mock_direct.return_value = _final_brief(title="Bad", hook="Bad")
     mock_script.return_value = tmp_path / "script.json"
     raw = tmp_path / "video.mp4"
     raw.write_bytes(b"raw")
@@ -786,3 +767,73 @@ def test_merge_creative_video_no_narration(mock_run, tmp_path: Path):
     args = mock_run.call_args[0][0]
     assert "ffmpeg" in args
     assert "-c" in args or "copy" in args
+
+
+@patch("repo_to_shorts.hermes_skill.validate_media")
+@patch("repo_to_shorts.hermes_skill.ingest_target")
+@patch("repo_to_shorts.hermes_skill.direct")
+@patch("repo_to_shorts.hermes_skill.generate_manim_script")
+@patch("repo_to_shorts.hermes_skill.render_scene")
+@patch("repo_to_shorts.hermes_skill._merge_creative_video")
+def test_run_creative_pipeline_writes_production_manifests(
+    mock_merge,
+    mock_render,
+    mock_script,
+    mock_direct,
+    mock_ingest,
+    mock_validate,
+    tmp_path: Path,
+):
+    mock_ingest.return_value = FakeSnapshot()
+    mock_direct.return_value = _final_brief()
+    mock_script.return_value = tmp_path / "script.json"
+    raw = tmp_path / "video.mp4"
+    raw.write_bytes(b"raw")
+    mock_render.return_value = raw
+    mock_validate.return_value = {"ok": True, "duration_seconds": 50, "resolution": "1080x1920", "has_audio": True, "errors": []}
+
+    result = run_creative_pipeline(".", out_dir=tmp_path, final=True)
+
+    run_dir = Path(result["run_dir"])
+    production = run_dir / "production"
+    assert (production / "design_profile.json").exists()
+    assert (production / "reference_pack.json").exists()
+    assert (production / "evidence_manifest.json").exists()
+    assert (production / "creative_brief.json").exists()
+    assert (production / "scene_plan.json").exists()
+    assert (production / "qa_report.json").exists()
+
+    metadata = json.loads((run_dir / "metadata.json").read_text(encoding="utf-8"))
+    assert "production/design_profile.json" in metadata["artifacts"]
+    assert "production/qa_report.json" in metadata["artifacts"]
+    assert mock_direct.call_args.kwargs["design_profile"]["schema_version"] == 1
+    assert mock_direct.call_args.kwargs["reference_pack"]["schema_version"] == 1
+
+
+def test_select_best_preview_candidate_uses_qa_score():
+    from repo_to_shorts.hermes_skill import _select_best_preview_candidate
+
+    weak = _final_brief(title="Weak", scenes=[
+        {"type": "Card", "headline": "INTRODUCING SEAMLESS AI POWERED WORKFLOW FOR YOUR ENTIRE TEAM TO OPTIMIZE EVERYTHING TODAY", "duration_seconds": 4, "evidence": []}
+    ])
+    strong = _final_brief(title="Strong")
+
+    chosen, report = _select_best_preview_candidate([weak, strong], design_profile={})
+
+    assert chosen.title == "Strong"
+    assert report["candidate_count"] == 2
+    assert report["selected_index"] == 1
+
+
+def test_final_qa_report_includes_comparison():
+    from repo_to_shorts.hermes_skill import _final_qa_report
+
+    qa = {"overall": "pass", "score": 0.92}
+    comparison = {"candidate_count": 3, "selected_index": 1}
+
+    result = _final_qa_report(qa, comparison)
+    assert result["preview_comparison"] == comparison
+    assert result["score"] == 0.92
+
+    result2 = _final_qa_report(qa, None)
+    assert "preview_comparison" not in result2

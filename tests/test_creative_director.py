@@ -253,3 +253,75 @@ def test_deterministic_fallback_returns_expected_structure():
 
     durations = [scene["duration_seconds"] for scene in result.scenes]
     assert sum(durations) == 60
+
+
+def test_parse_brief_preserves_taste_fields():
+    raw = json.dumps({
+        "style": "cinematic",
+        "title": "Taste Title",
+        "hook": "Watch the repo become a reel.",
+        "distribution_channel": "x_short",
+        "reference_pack": [{"label": "premium console"}],
+        "visual_world": "cinematic engineering console",
+        "motion_principles": ["motion guides attention"],
+        "shot_list": ["raw repo input", "proof metadata"],
+        "continuity_rules": ["captions stay inside safe area"],
+        "negative_prompts": ["generic AI SaaS soup"],
+        "scenes": [{"type": "ColdOpen", "duration_seconds": 5, "headline": "REPO BECOMES REEL"}],
+        "total_duration": 50,
+    })
+
+    result = _parse_brief(raw)
+
+    assert result.distribution_channel == "x_short"
+    assert result.reference_pack == [{"label": "premium console"}]
+    assert result.visual_world == "cinematic engineering console"
+    assert result.motion_principles == ["motion guides attention"]
+    assert result.shot_list == ["raw repo input", "proof metadata"]
+    assert result.continuity_rules == ["captions stay inside safe area"]
+    assert result.negative_prompts == ["generic AI SaaS soup"]
+
+
+def test_director_prompt_includes_design_profile_and_reference_pack():
+    prompt = _build_director_prompt(
+        {"repo_name": "repo", "description": "desc", "key_files": ["README.md"]},
+        final=True,
+        design_profile={"name": "Console", "colors": {"neutral": "#080A0F"}},
+        reference_pack={"references": [{"label": "premium console"}], "avoid": ["generic AI SaaS soup"]},
+    )
+
+    assert "DESIGN PROFILE" in prompt
+    assert "Console" in prompt
+    assert "REFERENCE PACK" in prompt
+    assert "premium console" in prompt
+    assert "generic AI SaaS soup" in prompt
+    assert "visual_world" in prompt
+    assert "negative_prompts" in prompt
+
+
+def test_direct_passes_taste_args(monkeypatch):
+    monkeypatch.setenv("OPENROUTER_API_KEY", "test-key")
+    calls = []
+
+    def fake_call(prompt, model, base_url, *, response_format=None):
+        calls.append(prompt)
+        return json.dumps({
+            "style": "cinematic",
+            "title": "Taste",
+            "hook": "Hook",
+            "scenes": [{"type": "ColdOpen", "duration_seconds": 5, "headline": "Test"}],
+            "distribution_channel": "x_short",
+        })
+
+    monkeypatch.setattr("repo_to_shorts.creative_director._call_openrouter_api", fake_call)
+
+    result = direct(
+        {"repo_name": "repo", "description": "desc"},
+        final=True,
+        design_profile={"name": "Profile"},
+        reference_pack={"references": [{"label": "ref"}]},
+    )
+
+    assert result.distribution_channel == "x_short"
+    assert "DESIGN PROFILE" in calls[0]
+    assert "REFERENCE PACK" in calls[0]

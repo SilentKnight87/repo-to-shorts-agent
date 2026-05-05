@@ -76,6 +76,7 @@ def creative(
         "--generated-music/--no-generated-music",
         help="Generate ambient music when no --music is supplied.",
     ),
+    compare_previews: bool = typer.Option(False, "--compare-previews", help="Generate and score preview concept variants before rendering."),
 ) -> None:
     """Generate a creative short video with Kimi 2.6 creative direction.
 
@@ -118,6 +119,7 @@ def creative(
             voice=voice,
             generated_music=generated_music,
             command=command,
+            compare_previews=compare_previews,
         )
     except Exception as exc:  # noqa: BLE001
         raise typer.BadParameter(str(exc)) from exc

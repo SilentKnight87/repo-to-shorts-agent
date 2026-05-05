@@ -112,21 +112,26 @@
     const creative = true;
     let preview;
     let skipAudio;
+    let finalMode;
 
     if (tape === "sp") {
       preview = true;
+      finalMode = false;
       skipAudio = true; // forced silent for fastest preview
     } else if (tape === "lp") {
       preview = true;
+      finalMode = false;
       skipAudio = audio === "off";
     } else {
       // ep (full master)
       preview = false;
+      finalMode = true;
       skipAudio = audio === "off";
     }
 
     setFlag(form, "creative_mode", creative);
     setFlag(form, "preview", preview);
+    setFlag(form, "final", finalMode);
     setFlag(form, "skip_audio", skipAudio);
   }
 

@@ -81,6 +81,12 @@ class TestHomePage:
         # Bottom
         assert "scope-strip" in html
 
+    def test_home_page_toggle_clusters_have_js_contract(self):
+        html = render_home_page([])
+        assert 'class="toggle-mode" data-toggle="tape-mode"' in html
+        assert 'class="toggle-mode" data-toggle="audio-mode"' in html
+        assert 'data-flag="final"' in html
+
     def test_home_page_loads_static_assets_not_inline(self):
         html = render_home_page([])
         # New external assets
@@ -183,7 +189,7 @@ class TestGenerate:
             metadata = {
                 "artifacts": ["demo.mp4", "metadata.json"],
                 "kimi": {"mode": "live-api"},
-                "render": {"mode": "mp4", "renderer": "pillow+ffmpeg-enhanced"},
+                "render": {"mode": "mp4", "renderer": "pillow+ffmpeg-enhanced", "preview": True, "final": False, "validation": {"ok": True, "errors": []}},
                 "creative_brief": {"style": "dark-terminal", "title": "Test", "hook": "Hook", "scenes": []},
             }
             (run_dir / "metadata.json").write_text(json.dumps(metadata))
@@ -196,7 +202,7 @@ class TestGenerate:
             metadata = {
                 "artifacts": ["demo.html", "metadata.json"],
                 "kimi": {"mode": "live-api"},
-                "render": {"status": "success"},
+                "render": {"status": "success", "preview": False, "final": False, "validation": {"ok": True, "errors": []}},
             }
             (run_dir / "metadata.json").write_text(json.dumps(metadata))
             return run_dir
@@ -218,7 +224,7 @@ class TestGenerate:
             with urllib.request.urlopen(req) as resp:
                 assert resp.status == 200
                 body = resp.read().decode()
-                assert "BROADCAST COMPLETE" in body
+                assert "PREVIEW DRAFT" in body
                 assert "BROADCAST CUE SHEET" in body
         finally:
             _stop_server(server)
@@ -239,7 +245,7 @@ class TestGenerate:
             metadata = {
                 "artifacts": ["demo.html", "metadata.json"],
                 "kimi": {"mode": "deterministic-fallback"},
-                "render": {"status": "skipped"},
+                "render": {"status": "skipped", "preview": False, "final": False, "validation": {"ok": True, "errors": []}},
             }
             (run_dir / "metadata.json").write_text(json.dumps(metadata))
             return run_dir
@@ -262,6 +268,131 @@ class TestGenerate:
 
         assert len(analyze_calls) == 1
         assert analyze_calls[0]["render"] == "none"
+
+
+class TestSuccessPage:
+    def test_success_page_labels_broadcast_complete_for_ok_final(self):
+        from repo_to_shorts.web import render_success_page
+
+        html = render_success_page(Path("/tmp/fake"), {
+            "artifacts": ["demo.mp4"],
+            "kimi": {"mode": "live-api"},
+            "render": {"mode": "mp4", "final": True, "preview": False, "validation": {"ok": True, "errors": []}},
+            "creative_brief": {"title": "Final", "hook": "Final hook", "scenes": []},
+        })
+        assert "// BROADCAST COMPLETE" in html
+        assert "VALIDATION FAILED" not in html
+        assert "PREVIEW DRAFT" not in html
+
+    def test_success_page_labels_preview_draft(self):
+        from repo_to_shorts.web import render_success_page
+
+        html = render_success_page(Path("/tmp/fake"), {
+            "artifacts": ["demo.mp4"],
+            "kimi": {"mode": "live-api"},
+            "render": {"mode": "mp4", "preview": True, "final": False, "validation": {"ok": True, "errors": []}},
+            "creative_brief": {"title": "Draft", "hook": "Draft hook", "scenes": []},
+        })
+        assert "// PREVIEW DRAFT" in html
+        assert "VALIDATION FAILED" not in html
+        assert "BROADCAST COMPLETE" not in html
+
+    def test_success_page_labels_validation_failed_when_not_ok(self):
+        from repo_to_shorts.web import render_success_page
+
+        html = render_success_page(Path("/tmp/fake"), {
+            "artifacts": ["demo.mp4"],
+            "kimi": {"mode": "deterministic-fallback"},
+            "render": {"mode": "mp4", "preview": True, "final": False, "validation": {"ok": False, "errors": ["duration must be 43-62 seconds"]}},
+            "creative_brief": {"title": "Draft", "hook": "Draft hook", "scenes": []},
+        })
+        assert "// VALIDATION FAILED" in html
+        assert "duration must be 43-62 seconds" in html
+        assert "BROADCAST COMPLETE" not in html
+
+    def test_success_page_labels_package_complete_for_non_creative_runs(self):
+        from repo_to_shorts.web import render_success_page
+
+        html = render_success_page(Path("/tmp/fake"), {
+            "artifacts": ["demo.html"],
+            "kimi": {"mode": "deterministic-fallback"},
+            "render": {"final": False, "preview": False, "validation": {"ok": True}},
+            "creative_brief": {"title": "Package", "hook": "Package hook", "scenes": []},
+        })
+        assert "// PACKAGE COMPLETE" in html
+
+
+class TestGenerateFinalMode:
+    def test_generate_creative_final_mode_passes_final_flag_in_form(self, tmp_path: Path, monkeypatch):
+        calls = []
+
+        def fake_run_creative_pipeline(target, audience, out_dir, **kwargs):
+            calls.append(kwargs)
+            run_dir = tmp_path / "20260504-final"
+            run_dir.mkdir(parents=True, exist_ok=True)
+            metadata = {
+                "artifacts": ["demo.mp4", "metadata.json"],
+                "kimi": {"mode": "live-api"},
+                "render": {"mode": "mp4", "final": True, "validation": {"ok": True, "errors": []}},
+                "creative_brief": {"title": "Final", "hook": "Final hook", "scenes": []},
+            }
+            (run_dir / "metadata.json").write_text(json.dumps(metadata), encoding="utf-8")
+            (run_dir / "demo.mp4").write_bytes(b"mp4")
+            return {"output": str(run_dir / "demo.mp4"), "run_dir": str(run_dir)}
+
+        monkeypatch.setattr("repo_to_shorts.hermes_skill.run_creative_pipeline", fake_run_creative_pipeline)
+
+        server, port = _start_server(tmp_path)
+        try:
+            data = urllib.parse.urlencode({
+                "target": ".",
+                "audience": "builders",
+                "kimi_model": "moonshotai/kimi-k2.6",
+                "creative_mode": "on",
+                "final": "on",
+            }).encode()
+            req = urllib.request.Request(f"http://127.0.0.1:{port}/generate", data=data, method="POST")
+            with urllib.request.urlopen(req) as resp:
+                assert resp.status == 200
+        finally:
+            _stop_server(server)
+
+        assert calls[0]["final"] is True
+        assert calls[0]["preview"] is False
+
+    def test_generate_creative_final_mode_shows_broadcast_complete(self, tmp_path: Path, monkeypatch):
+        def fake_run_creative_pipeline(target, audience, out_dir, **kwargs):
+            run_dir = tmp_path / "20260504-final"
+            run_dir.mkdir(parents=True, exist_ok=True)
+            metadata = {
+                "artifacts": ["demo.mp4", "metadata.json"],
+                "kimi": {"mode": "live-api"},
+                "render": {"mode": "mp4", "final": True, "preview": False, "validation": {"ok": True, "errors": []}},
+                "creative_brief": {"title": "Final", "hook": "Final hook", "scenes": []},
+            }
+            (run_dir / "metadata.json").write_text(json.dumps(metadata))
+            (run_dir / "demo.mp4").write_bytes(b"mp4")
+            return {"output": str(run_dir / "demo.mp4"), "run_dir": str(run_dir)}
+
+        monkeypatch.setattr("repo_to_shorts.hermes_skill.run_creative_pipeline", fake_run_creative_pipeline)
+
+        server, port = _start_server(tmp_path)
+        try:
+            data = urllib.parse.urlencode({
+                "target": ".",
+                "audience": "builders",
+                "kimi_model": "moonshotai/kimi-k2.6",
+                "creative_mode": "on",
+                "final": "on",
+            }).encode()
+            req = urllib.request.Request(f"http://127.0.0.1:{port}/generate", data=data, method="POST")
+            with urllib.request.urlopen(req) as resp:
+                assert resp.status == 200
+                body = resp.read().decode()
+                assert "// BROADCAST COMPLETE" in body
+                assert "VALIDATION FAILED" not in body
+        finally:
+            _stop_server(server)
 
 
 class TestPathTraversal:

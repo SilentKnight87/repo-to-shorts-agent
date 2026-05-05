@@ -19,15 +19,30 @@ class CreativeBrief:
     provider: str = "openrouter"
     model: str = "moonshotai/kimi-k2.6"
     fallback_reason: str | None = None
+    distribution_channel: str = "x_short"
+    reference_pack: list = field(default_factory=list)
+    visual_world: str = "cinematic engineering console"
+    motion_principles: list[str] = field(default_factory=list)
+    shot_list: list[str] = field(default_factory=list)
+    continuity_rules: list[str] = field(default_factory=list)
+    negative_prompts: list[str] = field(default_factory=list)
+    quality_bar: dict = field(default_factory=dict)
 
 
-def direct(repo_analysis: dict, model: str = "moonshotai/kimi-k2.6", *, final: bool = False) -> CreativeBrief:
+def direct(
+    repo_analysis: dict,
+    model: str = "moonshotai/kimi-k2.6",
+    *,
+    final: bool = False,
+    design_profile: dict | None = None,
+    reference_pack: dict | None = None,
+) -> CreativeBrief:
     """Kimi 2.6 creative director: analyze repo → output creative brief."""
     api_key = os.environ.get("OPENROUTER_API_KEY") or os.environ.get("KIMI_API_KEY")
     if not api_key:
         return _deterministic_fallback(repo_analysis, model=model)
 
-    prompt = _build_director_prompt(repo_analysis, final=final)
+    prompt = _build_director_prompt(repo_analysis, final=final, design_profile=design_profile, reference_pack=reference_pack)
     try:
         response = _call_openrouter_api(
             prompt,
@@ -51,7 +66,13 @@ def direct(repo_analysis: dict, model: str = "moonshotai/kimi-k2.6", *, final: b
         )
 
 
-def _build_director_prompt(analysis: dict, *, final: bool = False) -> str:
+def _build_director_prompt(
+    analysis: dict,
+    *,
+    final: bool = False,
+    design_profile: dict | None = None,
+    reference_pack: dict | None = None,
+) -> str:
     """Build the creative director prompt from repo analysis."""
     prompt = f"""You are an elite creative director making a hackathon demo video that must feel like Runway/Linear, not a generated slideshow.
 Your job is to convert code evidence into a sharp 60-second vertical short with a real point of view.
@@ -185,6 +206,26 @@ Anti-patterns — never produce these:
 - Marketing words (optimize, leverage, seamless, robust, game-changing, unleash, supercharge)
 - Vague pain ("demo videos are hard") — use specifics ("6 hours screen-recording slides")
 """
+    if design_profile or reference_pack:
+        design_context = json.dumps(design_profile or {}, indent=2)[:4000]
+        reference_context = json.dumps(reference_pack or {}, indent=2)[:4000]
+        taste_block = f"""
+DESIGN PROFILE:
+{design_context}
+
+REFERENCE PACK:
+{reference_context}
+
+Additional output fields required in the JSON root:
+- "distribution_channel": "x_short" (the platform this short is made for)
+- "reference_pack": list of reference labels used
+- "visual_world": string describing the visual world (e.g. "cinematic engineering console")
+- "motion_principles": list of motion rules (e.g. ["motion guides attention"])
+- "shot_list": list of shot descriptions
+- "continuity_rules": list of rules for scene-to-scene consistency
+- "negative_prompts": list of things to explicitly avoid
+"""
+        prompt += taste_block
     return prompt
 
 
@@ -266,6 +307,14 @@ def _parse_brief(content: str) -> CreativeBrief:
         provider=data.get("provider", "openrouter"),
         model=data.get("model", "moonshotai/kimi-k2.6"),
         fallback_reason=data.get("fallback_reason"),
+        distribution_channel=data.get("distribution_channel", "x_short"),
+        reference_pack=data.get("reference_pack", []),
+        visual_world=data.get("visual_world", "cinematic engineering console"),
+        motion_principles=data.get("motion_principles", []),
+        shot_list=data.get("shot_list", []),
+        continuity_rules=data.get("continuity_rules", []),
+        negative_prompts=data.get("negative_prompts", []),
+        quality_bar=data.get("quality_bar", {}),
     )
 
 

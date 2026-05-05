@@ -141,13 +141,13 @@ def render_home_page(runs: list[Path], message: str | None = None) -> str:
     <input class="tape-input__field" type="text" id="field-kimi" name="kimi_model" value="{html.escape(DEFAULT_KIMI_MODEL)}">
   </div>
   <div class="toggle-row">
-    <div class="toggle-mode" role="radiogroup" aria-label="Tape mode">
+    <div class="toggle-mode" data-toggle="tape-mode" role="radiogroup" aria-label="Tape mode">
       <span class="toggle-mode__caption">MODE</span>
       <div class="toggle-mode__pill is-lit" data-tape-mode="sp" role="radio" tabindex="0" aria-checked="true">SP</div>
       <div class="toggle-mode__pill" data-tape-mode="lp" role="radio" tabindex="-1" aria-checked="false">LP</div>
       <div class="toggle-mode__pill" data-tape-mode="ep" role="radio" tabindex="-1" aria-checked="false">EP</div>
     </div>
-    <div class="toggle-mode" role="radiogroup" aria-label="Audio mode">
+    <div class="toggle-mode" data-toggle="audio-mode" role="radiogroup" aria-label="Audio mode">
       <span class="toggle-mode__caption">AUDIO</span>
       <div class="toggle-mode__pill" data-audio-mode="dolby" role="radio" tabindex="-1" aria-checked="false">DOLBY</div>
       <div class="toggle-mode__pill is-lit" data-audio-mode="off" role="radio" tabindex="0" aria-checked="true">OFF</div>
@@ -157,6 +157,7 @@ def render_home_page(runs: list[Path], message: str | None = None) -> str:
   <input type="hidden" name="preview" value="on" data-flag="preview">
   <input type="hidden" name="skip_audio" value="on" data-flag="skip_audio">
   <input type="hidden" name="" value="" data-flag="render_mp4">
+  <input type="hidden" name="" value="" data-flag="final">
   <input type="hidden" name="session_id" value="" id="session-id">
   <div class="btn-row">
     <button type="button" class="btn-tape btn-tape--ghost" data-action="ingest">⏏ INGEST</button>
@@ -263,6 +264,22 @@ def render_success_page(run_dir: Path, run_metadata: dict) -> str:
     title_text = brief.get("title", "Broadcast complete") if isinstance(brief, dict) else "Broadcast complete"
     hook_text = brief.get("hook", "") if isinstance(brief, dict) else ""
 
+    validation = render_info.get("validation") if isinstance(render_info, dict) else {}
+    validation_ok = bool(validation.get("ok")) if isinstance(validation, dict) else True
+    is_preview = bool(render_info.get("preview")) if isinstance(render_info, dict) else False
+    is_final = bool(render_info.get("final")) if isinstance(render_info, dict) else False
+
+    if not validation_ok:
+        state_label = "VALIDATION FAILED"
+    elif is_preview:
+        state_label = "PREVIEW DRAFT"
+    elif is_final:
+        state_label = "BROADCAST COMPLETE"
+    else:
+        state_label = "PACKAGE COMPLETE"
+
+    validation_errors = validation.get("errors", []) if isinstance(validation, dict) else []
+
     scene_rows = []
     for idx, scene in enumerate(scenes, start=1):
         if not isinstance(scene, dict):
@@ -356,9 +373,10 @@ def render_success_page(run_dir: Path, run_metadata: dict) -> str:
 </header>
 {colorbars}
 <section class="hero hero--success">
-  <div class="kicker">// BROADCAST COMPLETE</div>
+  <div class="kicker">{html.escape('// ' + state_label)}</div>
   <h1 class="glitch-headline glitch-headline--md">{html.escape(str(title_text))}</h1>
   <p class="lede">{html.escape(str(hook_text))}</p>
+  {'<div class="deck error-log"><pre class="error-message">' + html.escape(chr(10).join(validation_errors)) + '</pre></div>' if validation_errors else ''}
 </section>
 <section class="result-grid">
   <div class="deck master-viewer">
@@ -595,6 +613,9 @@ def _make_handler(runs_dir: Path):
                 creative_mode = "creative_mode" in form
                 preview = "preview" in form
                 skip_audio = "skip_audio" in form
+                final = "final" in form
+                if final:
+                    preview = False
                 session_id = form.get("session_id", [""])[0].strip()
 
                 if not target:
@@ -619,6 +640,7 @@ def _make_handler(runs_dir: Path):
                             session_id=session_id,
                             preview=preview,
                             skip_audio=skip_audio,
+                            final=final,
                         )
                         run_dir = Path(result["run_dir"])
                     else:

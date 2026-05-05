@@ -116,3 +116,17 @@ def test_creative_submission_command_preserves_missing_music_path(monkeypatch):
     assert result.exit_code == 0
     assert "--music" in captured["kwargs"]["command"]
     assert "missing.mp3" in captured["kwargs"]["command"]
+
+
+def test_creative_accepts_compare_previews_flag(monkeypatch, tmp_path):
+    calls = []
+
+    def fake_run_creative_pipeline(target, **kwargs):
+        calls.append({"target": target, **kwargs})
+        return {"run_dir": str(tmp_path), "output": str(tmp_path / "demo.mp4")}
+
+    monkeypatch.setattr("repo_to_shorts.hermes_skill.run_creative_pipeline", fake_run_creative_pipeline)
+    result = runner.invoke(app, ["creative", ".", "--compare-previews"])
+
+    assert result.exit_code == 0
+    assert calls[0]["compare_previews"] is True
