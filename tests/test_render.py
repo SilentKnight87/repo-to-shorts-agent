@@ -5,6 +5,12 @@ from pathlib import Path
 
 import pytest
 
+from repo_to_shorts.heygen_render import (
+    HeyGenConfig,
+    build_heygen_payload,
+    build_heygen_script,
+    render_heygen_preview_html,
+)
 from repo_to_shorts.hyperframes_render import render_hyperframes_html, render_hyperframes_video
 from repo_to_shorts.ingest import RepoSnapshot
 from repo_to_shorts.pipeline import StoryPackage
@@ -109,6 +115,45 @@ def test_hyperframes_html_uses_required_composition_contract():
     assert 'data-track-index="1"' in html
     assert "window.__timelines['main']" in html
     assert "gsap.timeline({ paused: true })" in html
+
+
+def test_heygen_payload_uses_vertical_avatar_video_contract():
+    scenes = [VideoScene(title="Hook", body="Body", footer="Footer", accent="#22d3ee")]
+    config = HeyGenConfig(api_key="secret", avatar_id="avatar-123", voice_id="voice-456")
+
+    payload = build_heygen_payload(scenes, sample_package(), config)
+
+    assert payload["caption"] is True
+    assert payload["dimension"] == {"width": 1080, "height": 1920}
+    first_input = payload["video_inputs"][0]
+    assert first_input["character"]["type"] == "avatar"
+    assert first_input["character"]["avatar_id"] == "avatar-123"
+    assert first_input["voice"]["type"] == "text"
+    assert first_input["voice"]["voice_id"] == "voice-456"
+    assert "launch-ready short" in first_input["voice"]["input_text"]
+
+
+def test_heygen_script_is_bounded_for_api_limits():
+    scenes = [VideoScene(title="Long", body="word " * 6000)]
+
+    script = build_heygen_script(scenes, sample_package(), limit=500)
+
+    assert len(script) <= 500
+    assert script.endswith("word")
+
+
+def test_heygen_preview_html_preserves_hyperframes_contract():
+    scenes = [VideoScene(title="Hook", body="Body", footer="Footer", accent="#22d3ee")]
+
+    html = render_heygen_preview_html(scenes, sample_package())
+
+    assert 'data-composition-id="main"' in html
+    assert 'data-width="1080"' in html
+    assert 'data-height="1920"' in html
+    assert "HeyGen avatar cut" in html
+    assert "avatar-stage clip" in html
+    assert 'data-track-index="99"' in html
+    assert "window.__timelines['main']" in html
 
 
 def test_hyperframes_renderer_writes_project_lints_and_renders(monkeypatch, tmp_path: Path):

@@ -9,8 +9,8 @@ Turn any GitHub repo into a 60-second animated creative short. Built for the Nou
 1. **Paste a GitHub URL** into the web UI
 2. **Kimi 2.6 (Creative Director)** analyzes the repo and designs a creative brief: visual style, scene breakdown, narration script, pacing
 3. **HyperFrames renderer** turns generated story scenes into HTML-native video compositions with GSAP timelines
-4. **HyperFrames CLI** lints and renders the composition to MP4 via browser capture + ffmpeg
-5. **Output:** a 1080×1920 vertical MP4 plus the editable `hyperframes/index.html` source
+4. **Optional HeyGen renderer** can create an avatar-presenter cut when `HEYGEN_API_KEY`, `HEYGEN_AVATAR_ID`, and `HEYGEN_VOICE_ID` are configured
+5. **Output:** a 1080×1920 vertical MP4 plus editable source artifacts
 
 All of this happens in one click through the browser.
 
@@ -41,7 +41,7 @@ repo-shorts web --host 0.0.0.0 --port 8765
 .venv/bin/python -m pip install -e '.[dev,render]'
 ```
 
-Requires Node.js 22+, `npx`, system `ffmpeg`, and `ffprobe`. The classic creative command still uses Pillow for legacy frame rendering; `repo-shorts analyze --render mp4` now uses HyperFrames.
+Requires Node.js 22+, `npx`, system `ffmpeg`, and `ffprobe`. The classic creative command still uses Pillow for legacy frame rendering; `repo-shorts analyze --render mp4` now uses HyperFrames. HeyGen live rendering additionally requires `HEYGEN_API_KEY`, `HEYGEN_AVATAR_ID`, and `HEYGEN_VOICE_ID`.
 
 ## API key setup
 
@@ -63,6 +63,12 @@ repo-shorts creative https://github.com/owner/repo --out runs
 
 # Classic artifact package
 repo-shorts analyze https://github.com/owner/repo --out runs --render mp4
+
+# Local HeyGen-style avatar mockup, no API credits spent
+repo-shorts analyze https://github.com/owner/repo --out runs --render heygen-preview
+
+# Live HeyGen avatar video, requires HEYGEN_* env vars and spends credits
+repo-shorts analyze https://github.com/owner/repo --out runs --render heygen
 ```
 
 ## Architecture
@@ -79,8 +85,9 @@ GitHub URL
     v
 [ Renderer ]  -> HyperFrames HTML composition + GSAP timeline
     |              browser-captured frames, linter-verified structure
+    |              optional HeyGen avatar-presenter cut via API
     v
-[ Composer ]  -> HyperFrames + ffmpeg -> demo.mp4
+[ Composer ]  -> HyperFrames or HeyGen -> demo.mp4
     |
     v
 [ Metadata ]  -> metadata.json proves Kimi mode + creative brief
