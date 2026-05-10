@@ -155,6 +155,39 @@ def test_run_analysis_with_mp4_render_adds_demo_mp4_and_metadata(tmp_path: Path,
     }
 
 
+def test_run_analysis_with_heygen_preview_adds_preview_artifacts_and_metadata(tmp_path: Path, monkeypatch):
+    repo = make_sample_repo(tmp_path)
+    out = tmp_path / "runs"
+
+    def fake_render_heygen_preview_video(run_dir, scenes, package):
+        output = Path(run_dir) / "heygen-preview.mp4"
+        output.write_bytes(b"fake heygen preview")
+        (Path(run_dir) / "heygen-preview").mkdir()
+        (Path(run_dir) / "heygen-preview" / "index.html").write_text("<!doctype html>", encoding="utf-8")
+        return type(
+            "RenderResult",
+            (),
+            {"output_path": output, "mode": "mp4", "renderer": "heygen-preview", "scene_count": len(scenes), "error": None},
+        )()
+
+    monkeypatch.setattr("repo_to_shorts.pipeline.render_heygen_preview_video", fake_render_heygen_preview_video)
+
+    run_dir = run_analysis(str(repo), audience="Python builders", out_dir=out, render="heygen-preview")
+
+    assert (run_dir / "heygen-preview.mp4").exists()
+    metadata = json.loads((run_dir / "metadata.json").read_text(encoding="utf-8"))
+    assert "heygen-preview.mp4" in metadata["artifacts"]
+    assert "heygen-preview/index.html" in metadata["artifacts"]
+    assert metadata["render"] == {
+        "mode": "mp4",
+        "status": "success",
+        "renderer": "heygen-preview",
+        "output": "heygen-preview.mp4",
+        "scene_count": 5,
+        "error": None,
+    }
+
+
 def test_run_analysis_with_failed_mp4_render_keeps_core_artifacts_and_records_failure(tmp_path: Path, monkeypatch):
     repo = make_sample_repo(tmp_path)
     out = tmp_path / "runs"

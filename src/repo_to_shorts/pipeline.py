@@ -8,6 +8,7 @@ from pathlib import Path
 
 from jinja2 import Template
 
+from repo_to_shorts.heygen_render import render_heygen_preview_video, render_heygen_video
 from repo_to_shorts.hyperframes_render import render_hyperframes_video
 from repo_to_shorts.ingest import RepoSnapshot, ingest_target
 from repo_to_shorts.kimi import critique_story
@@ -44,8 +45,8 @@ def run_analysis(
     kimi_model: str | None = None,
     render: str = "none",
 ) -> Path:
-    if render not in {"none", "mp4", "hyperframes"}:
-        raise ValueError("render must be one of: none, mp4, hyperframes")
+    if render not in {"none", "mp4", "hyperframes", "heygen-preview", "heygen"}:
+        raise ValueError("render must be one of: none, mp4, hyperframes, heygen-preview, heygen")
     snapshot = ingest_target(target)
     timestamp = datetime.now().strftime("%Y%m%d-%H%M%S")
     run_dir = Path(out_dir) / f"{timestamp}-{_slug(snapshot.name)}"
@@ -75,22 +76,33 @@ def run_analysis(
 
     artifacts = list(ARTIFACTS)
     render_metadata = {"mode": "none", "status": "skipped", "renderer": None, "output": None, "scene_count": 0, "error": None}
-    if render in {"mp4", "hyperframes"}:
+    if render in {"mp4", "hyperframes", "heygen-preview", "heygen"}:
         scenes = build_video_scenes(snapshot, audience, package, kimi.text)
+        renderer_name = "hyperframes"
+        artifact_prefix = "hyperframes"
+        renderer = render_hyperframes_video
+        if render == "heygen-preview":
+            renderer_name = "heygen-preview"
+            artifact_prefix = "heygen-preview"
+            renderer = render_heygen_preview_video
+        elif render == "heygen":
+            renderer_name = "heygen"
+            artifact_prefix = "heygen"
+            renderer = render_heygen_video
         try:
-            result = render_hyperframes_video(run_dir, scenes, package)
+            result = renderer(run_dir, scenes, package)
         except Exception as exc:  # noqa: BLE001 - optional renderer should not break core artifacts.
             render_metadata = {
                 "mode": "mp4",
                 "status": "failed",
-                "renderer": "hyperframes",
+                "renderer": renderer_name,
                 "output": None,
                 "scene_count": len(scenes),
                 "error": str(exc),
             }
         else:
             artifacts.append(result.output_path.name)
-            artifacts.append("hyperframes/index.html")
+            artifacts.append(f"{artifact_prefix}/index.html" if render != "heygen" else "heygen/request.json")
             render_metadata = {
                 "mode": result.mode,
                 "status": "success" if result.error is None else "failed",
