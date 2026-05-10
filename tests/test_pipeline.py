@@ -115,33 +115,40 @@ def test_run_analysis_writes_launch_ready_artifact_set(tmp_path: Path):
     assert "Sample Repo" in (run_dir / "repo_brief.md").read_text(encoding="utf-8")
     assert "Kimi critic" in (run_dir / "kimi_critique.md").read_text(encoding="utf-8")
     assert metadata["render"] == {"mode": "none", "status": "skipped", "renderer": None, "output": None, "scene_count": 0, "error": None}
-    assert "<!doctype html>" in (run_dir / "demo.html").read_text(encoding="utf-8").lower()
+    demo_html = (run_dir / "demo.html").read_text(encoding="utf-8")
+    assert "<!doctype html>" in demo_html.lower()
+    assert "9:16 recordable demo page" in demo_html
+    assert "60-second recording timeline" in demo_html
+    assert demo_html.count('class="scene"') == 5
 
 
 def test_run_analysis_with_mp4_render_adds_demo_mp4_and_metadata(tmp_path: Path, monkeypatch):
     repo = make_sample_repo(tmp_path)
     out = tmp_path / "runs"
 
-    def fake_render_video(run_dir, scenes, config=None):
+    def fake_render_hyperframes_video(run_dir, scenes, package):
         output = Path(run_dir) / "demo.mp4"
         output.write_bytes(b"fake mp4")
+        (Path(run_dir) / "hyperframes").mkdir()
+        (Path(run_dir) / "hyperframes" / "index.html").write_text("<!doctype html>", encoding="utf-8")
         return type(
             "RenderResult",
             (),
-            {"output_path": output, "mode": "mp4", "renderer": "pillow+ffmpeg", "scene_count": len(scenes), "error": None},
+            {"output_path": output, "mode": "mp4", "renderer": "hyperframes", "scene_count": len(scenes), "error": None},
         )()
 
-    monkeypatch.setattr("repo_to_shorts.pipeline.render_video", fake_render_video)
+    monkeypatch.setattr("repo_to_shorts.pipeline.render_hyperframes_video", fake_render_hyperframes_video)
 
     run_dir = run_analysis(str(repo), audience="Python builders", out_dir=out, render="mp4")
 
     assert (run_dir / "demo.mp4").exists()
     metadata = json.loads((run_dir / "metadata.json").read_text(encoding="utf-8"))
     assert "demo.mp4" in metadata["artifacts"]
+    assert "hyperframes/index.html" in metadata["artifacts"]
     assert metadata["render"] == {
         "mode": "mp4",
         "status": "success",
-        "renderer": "pillow+ffmpeg",
+        "renderer": "hyperframes",
         "output": "demo.mp4",
         "scene_count": 5,
         "error": None,
@@ -152,10 +159,10 @@ def test_run_analysis_with_failed_mp4_render_keeps_core_artifacts_and_records_fa
     repo = make_sample_repo(tmp_path)
     out = tmp_path / "runs"
 
-    def fake_render_video(run_dir, scenes, config=None):
-        raise RuntimeError("ffmpeg exploded")
+    def fake_render_hyperframes_video(run_dir, scenes, package):
+        raise RuntimeError("hyperframes exploded")
 
-    monkeypatch.setattr("repo_to_shorts.pipeline.render_video", fake_render_video)
+    monkeypatch.setattr("repo_to_shorts.pipeline.render_hyperframes_video", fake_render_hyperframes_video)
 
     run_dir = run_analysis(str(repo), audience="Python builders", out_dir=out, render="mp4")
 
@@ -166,10 +173,10 @@ def test_run_analysis_with_failed_mp4_render_keeps_core_artifacts_and_records_fa
     assert metadata["render"] == {
         "mode": "mp4",
         "status": "failed",
-        "renderer": "pillow+ffmpeg",
+        "renderer": "hyperframes",
         "output": None,
         "scene_count": 5,
-        "error": "ffmpeg exploded",
+        "error": "hyperframes exploded",
     }
 
 
@@ -218,16 +225,16 @@ def test_cli_analyze_smoke_writes_artifacts_to_requested_out_dir(tmp_path: Path,
     out = tmp_path / "custom-runs"
     runner = CliRunner()
 
-    def fake_render_video(run_dir, scenes, config=None):
+    def fake_render_hyperframes_video(run_dir, scenes, package):
         output = Path(run_dir) / "demo.mp4"
         output.write_bytes(b"fake mp4")
         return type(
             "RenderResult",
             (),
-            {"output_path": output, "mode": "mp4", "renderer": "pillow+ffmpeg", "scene_count": len(scenes), "error": None},
+            {"output_path": output, "mode": "mp4", "renderer": "hyperframes", "scene_count": len(scenes), "error": None},
         )()
 
-    monkeypatch.setattr("repo_to_shorts.pipeline.render_video", fake_render_video)
+    monkeypatch.setattr("repo_to_shorts.pipeline.render_hyperframes_video", fake_render_hyperframes_video)
 
     result = runner.invoke(
         app,

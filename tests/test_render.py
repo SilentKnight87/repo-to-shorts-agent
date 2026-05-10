@@ -5,6 +5,7 @@ from pathlib import Path
 
 import pytest
 
+from repo_to_shorts.hyperframes_render import render_hyperframes_html, render_hyperframes_video
 from repo_to_shorts.ingest import RepoSnapshot
 from repo_to_shorts.pipeline import StoryPackage
 from repo_to_shorts.render import (
@@ -95,6 +96,42 @@ def test_render_scene_png_writes_vertical_image(tmp_path: Path):
 
     with Image.open(output) as image:
         assert image.size == (1080, 1920)
+
+
+def test_hyperframes_html_uses_required_composition_contract():
+    scenes = [VideoScene(title="Hook", body="Body", footer="Footer", accent="#22d3ee")]
+    html = render_hyperframes_html(scenes, sample_package())
+
+    assert 'data-composition-id="main"' in html
+    assert 'data-width="1080"' in html
+    assert 'data-height="1920"' in html
+    assert 'class="scene clip"' in html
+    assert 'data-track-index="1"' in html
+    assert "window.__timelines['main']" in html
+    assert "gsap.timeline({ paused: true })" in html
+
+
+def test_hyperframes_renderer_writes_project_lints_and_renders(monkeypatch, tmp_path: Path):
+    commands = []
+
+    def fake_run(command, cwd, check, capture_output, text):
+        commands.append(command)
+        if "render" in command:
+            output = Path(command[-1])
+            output.write_bytes(b"fake hyperframes mp4")
+        return subprocess.CompletedProcess(command, 0, "", "")
+
+    monkeypatch.setattr("repo_to_shorts.hyperframes_render.ensure_hyperframes_runtime", lambda: None)
+    monkeypatch.setattr("repo_to_shorts.hyperframes_render.subprocess.run", fake_run)
+
+    result = render_hyperframes_video(tmp_path, [VideoScene(title="One", body="Body")], sample_package())
+
+    assert result.output_path == tmp_path / "demo.mp4"
+    assert result.output_path.exists()
+    assert result.renderer == "hyperframes"
+    assert (tmp_path / "hyperframes" / "index.html").exists()
+    assert any("lint" in command for command in commands)
+    assert any("render" in command for command in commands)
 
 
 def test_render_video_stitches_frames_with_ffmpeg(monkeypatch, tmp_path: Path):

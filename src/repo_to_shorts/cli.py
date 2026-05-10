@@ -33,7 +33,7 @@ def analyze(
     out: Path = typer.Option(DEFAULT_OUT, "--out", "-o", help="Directory where run folders are written."),
     force: bool = typer.Option(False, "--force", help="Overwrite an existing timestamped run directory if needed."),
     kimi_model: str | None = typer.Option(None, "--kimi-model", help="OpenRouter/Moonshot Kimi model name."),
-    render: str = typer.Option("none", "--render", help="Optional renderer: none or mp4."),
+    render: str = typer.Option("none", "--render", help="Optional renderer: none, mp4, or hyperframes. mp4 uses HyperFrames."),
 ) -> None:
     """Analyze TARGET and create a launch-ready short-video package."""
     try:

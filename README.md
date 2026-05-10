@@ -8,9 +8,9 @@ Turn any GitHub repo into a 60-second animated creative short. Built for the Nou
 
 1. **Paste a GitHub URL** into the web UI
 2. **Kimi 2.6 (Creative Director)** analyzes the repo and designs a creative brief: visual style, scene breakdown, narration script, pacing
-3. **Enhanced renderer** animates the scenes with gradients, fade reveals, typewriter text, and component architecture diagrams
-4. **TTS narration** (macOS `say`) reads the script and gets mixed into the video
-5. **Output:** a 1080×1920 vertical MP4, ready to post
+3. **HyperFrames renderer** turns generated story scenes into HTML-native video compositions with GSAP timelines
+4. **HyperFrames CLI** lints and renders the composition to MP4 via browser capture + ffmpeg
+5. **Output:** a 1080×1920 vertical MP4 plus the editable `hyperframes/index.html` source
 
 All of this happens in one click through the browser.
 
@@ -41,7 +41,7 @@ repo-shorts web --host 0.0.0.0 --port 8765
 .venv/bin/python -m pip install -e '.[dev,render]'
 ```
 
-Requires system `ffmpeg` and `ffprobe`.
+Requires Node.js 22+, `npx`, system `ffmpeg`, and `ffprobe`. The classic creative command still uses Pillow for legacy frame rendering; `repo-shorts analyze --render mp4` now uses HyperFrames.
 
 ## API key setup
 
@@ -77,10 +77,10 @@ GitHub URL
 [ Creative Director ]  -> Kimi 2.6 designs brief (style, scenes, narration)
     |
     v
-[ Renderer ]  -> Pillow generates 1800 animated frames (60s @ 30fps)
-    |              gradients, fades, typewriter, component reveals
+[ Renderer ]  -> HyperFrames HTML composition + GSAP timeline
+    |              browser-captured frames, linter-verified structure
     v
-[ Compositor ]  -> ffmpeg stitches frames + TTS narration -> demo.mp4
+[ Composer ]  -> HyperFrames + ffmpeg -> demo.mp4
     |
     v
 [ Metadata ]  -> metadata.json proves Kimi mode + creative brief
@@ -117,10 +117,10 @@ Visual tools: `manim` (code viz), `pretext` (typography), `ascii` (code art), `s
 
 Each run creates `runs/<timestamp>-<repo>/`:
 
-- `demo.mp4` — the final 60s creative short
+- `demo.mp4` — the final 1080×1920 MP4 rendered by HyperFrames
 - `metadata.json` — proof of Kimi mode, creative brief, render details
-- `video_raw.mp4` — video without audio (for remixing)
-- `manim_scene_descriptor.json` — the scene script fed to the renderer
+- `hyperframes/index.html` — editable HTML + GSAP video composition source
+- `hyperframes/package.json` — local HyperFrames render/lint commands
 
 For classic analysis mode, also generates: repo brief, storyboard, architecture SVG, narration script, captions, X/Discord copy, Kimi critique.
 
